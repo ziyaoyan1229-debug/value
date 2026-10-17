@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""每天收盤後：向證交所抓全市場盤後資料（STOCK_DAY_ALL、BWIBBU_d），只取網站上的股票，交給 update_live.py daily。
+"""每天收盤後：向證交所抓全市場盤後資料（MI_INDEX、BWIBBU_d），只取網站上的股票，交給 update_live.py daily。
 在 GitHub Actions 上跑（.github/workflows/daily.yml）。數字照證交所原樣，抓不到就跳過。"""
-import datetime, json, os, pathlib, subprocess, sys
+import datetime, json, os, re, pathlib, subprocess, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from twse import get, col, roc_report
 
@@ -12,15 +12,18 @@ today = datetime.date.fromisoformat(os.environ["DATE"]) if os.environ.get("DATE"
 d8 = f"{today:%Y%m%d}"
 inp = {"today": f"{today:%Y-%m-%d}", "date": None, "rows": {}}
 
-a = get(f"STOCK_DAY_ALL?date={d8}&response=json")
-if a and a.get("stat") == "OK" and a.get("data"):
-    dd = str(a.get("date") or "")
+a = get(f"MI_INDEX?date={d8}&type=ALLBUT0999&response=json")  # 每日收盤行情（全部，不含權證）
+t = next((t for t in (a or {}).get("tables", []) if "證券代號" in (t.get("fields") or []) and col(t.get("fields"), "收盤價") is not None), None)
+if a and a.get("stat") == "OK" and t and t.get("data"):
+    dd = str(a.get("date") or (a.get("params") or {}).get("date") or "")
     inp["date"] = f"{dd[:4]}-{dd[4:6]}-{dd[6:8]}" if len(dd) == 8 else None
-    f = a["fields"]
-    ic, iv, io, ih, il, icl, ich = col(f, "證券代號"), col(f, "成交股數"), col(f, "開盤"), col(f, "最高"), col(f, "最低"), col(f, "收盤"), col(f, "漲跌")
-    for r in a["data"]:
+    f = t["fields"]
+    ic, iv, io, ih, il, icl = col(f, "證券代號"), col(f, "成交股數"), col(f, "開盤價"), col(f, "最高價"), col(f, "最低價"), col(f, "收盤價")
+    isg, ich = col(f, "漲跌(+/-)"), col(f, "漲跌價差")
+    for r in t["data"]:
         if r[ic] in codes:
-            inp["rows"][r[ic]] = {"open": r[io], "high": r[ih], "low": r[il], "close": r[icl], "change": r[ich], "volume_shares": r[iv]}
+            sign = "-" if isg is not None and "-" in re.sub(r"<[^>]*>", "", str(r[isg])) else ""
+            inp["rows"][r[ic]] = {"open": r[io], "high": r[ih], "low": r[il], "close": r[icl], "change": sign + str(r[ich]).replace(",", ""), "volume_shares": r[iv]}
     b = get(f"BWIBBU_d?date={d8}&selectType=ALL&response=json")
     if b and b.get("stat") == "OK" and b.get("data"):
         f = b["fields"]
@@ -34,4 +37,4 @@ p = pathlib.Path("/tmp/in.json"); p.write_text(json.dumps(inp, ensure_ascii=Fals
 subprocess.run([sys.executable, str(ROOT / "tools" / "update_live.py"), "daily", str(p)], check=True)
 if os.environ.get("DATE"):
     lv = json.loads((ROOT / "live.json").read_text(encoding="utf-8"))
-    print("測試：quotes", len(lv["quotes"]["items"]), "valuation", len(lv.get("valuation", {})), "events", [e["id"] for e in lv.get("events", []) if e["date"] == inp["date"]])
+    print("測試：quotes", len((lv.get("quotes") or {}).get("items", {})), "valuation", len(lv.get("valuation", {})), "events", [e["id"] for e in lv.get("events", []) if e["date"] == inp["date"]])
