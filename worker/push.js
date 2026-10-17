@@ -7,6 +7,8 @@
 //   POST /send  Authorization: Bearer <PUSH_KEY>  { items: [{ code, kind, title, body, url, tag }] }
 //               → 推給有追蹤該股票、有開該類通知的裝置；回 { sent, gone, failed, subs }
 //   GET  /stats Authorization: Bearer <PUSH_KEY>  → { subs }
+//   GET  /rt?c=2330,2454                 → 盤中即時價（轉送證交所基本市況報導 mis.twse.com.tw，不存任何資料，同一台機器 15 秒內共用結果）
+//   GET  /k5?c=2330                      → 最近一個交易日的 5 分 K（轉送 Yahoo Finance，60 秒內共用結果）
 const SITE = 'https://ziyaoyan1229-debug.github.io/value/';
 const enc = new TextEncoder();
 const b64u = buf => { let s = ''; for (const b of new Uint8Array(buf)) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -62,6 +64,35 @@ async function allSubs(env) {
   return out;
 }
 const KINDS = ['buy', 'over', 'move', 'limit'];
+// 證交所和 Yahoo 都不讓網頁直接抓，所以這裡轉一手；只放在記憶體裡短暫共用，不寫 KV
+const MEMO = new Map();
+async function memo(key, ttl, fn) {
+  const m = MEMO.get(key); if (m && Date.now() - m.at < ttl) return m.v;
+  const v = await fn(); MEMO.set(key, { at: Date.now(), v }); if (MEMO.size > 300) MEMO.delete(MEMO.keys().next().value);
+  return v;
+}
+const UA = { 'user-agent': 'Mozilla/5.0 (value-taiwan-stock)', accept: 'application/json' };
+const nz = x => { const n = parseFloat(x); return isFinite(n) && n > 0 ? n : null; };
+const codesOf = u => [...new Set((u.searchParams.get('c') || '').split(',').filter(c => /^\d{4,6}[A-Z]?$/.test(c)))].slice(0, 30).sort();
+async function realtime(codes) {
+  const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + codes.map(c => `tse_${c}.tw`).join('|'), { headers: UA });
+  if (!r.ok) throw new Error('mis ' + r.status);
+  const j = await r.json(), items = {};
+  for (const m of j.msgArray || []) {
+    const bid = nz(String(m.b || '').split('_')[0]), last = nz(m.z), y = nz(m.y);
+    const d = String(m.d || ''), date = d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : null;
+    items[m.c] = { price: last || bid, last: !!last, prev: y, open: nz(m.o), high: nz(m.h), low: nz(m.l), volumeLots: nz(m.v), date, time: m.t || null };
+  }
+  return { at: new Date().toISOString(), source: '臺灣證券交易所 基本市況報導', items };
+}
+async function k5(code) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${code}.TW?interval=5m&range=1d`, { headers: UA });
+  if (!r.ok) throw new Error('yahoo ' + r.status);
+  const res = (await r.json()).chart?.result?.[0]; if (!res) throw new Error('yahoo empty');
+  const q = res.indicators?.quote?.[0] || {}, ts = res.timestamp || [], bars = [];
+  ts.forEach((t, i) => { if (q.open?.[i] != null && q.close?.[i] != null) bars.push([t, q.open[i], q.high[i], q.low[i], q.close[i], q.volume?.[i] || 0]); });
+  return { at: new Date().toISOString(), source: 'Yahoo Finance', prev: res.meta?.chartPreviousClose ?? res.meta?.previousClose ?? null, bars };
+}
 
 export default {
   async fetch(req, env) {
@@ -77,6 +108,14 @@ export default {
         const rec = { sub: { endpoint: s.endpoint, keys: { p256dh: s.keys.p256dh, auth: s.keys.auth } }, codes, types, at: Date.now() };
         await env.SUBS.put(await idOf(s.endpoint), JSON.stringify(rec));
         return json({ ok: true, codes: codes.length });
+      }
+      if (p === '/rt' && req.method === 'GET') {
+        const codes = codesOf(u); if (!codes.length) return json({ error: 'no codes' }, 400);
+        return json(await memo('rt:' + codes.join(','), 15000, () => realtime(codes)));
+      }
+      if (p === '/k5' && req.method === 'GET') {
+        const c = codesOf(u)[0]; if (!c) return json({ error: 'no code' }, 400);
+        return json(await memo('k5:' + c, 60000, () => k5(c)));
       }
       if (p === '/unsub' && req.method === 'POST') { const d = await req.json(); if (d && d.endpoint) await env.SUBS.delete(await idOf(d.endpoint)); return json({ ok: true }); }
       if (p === '/send' && req.method === 'POST') {
