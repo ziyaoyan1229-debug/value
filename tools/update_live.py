@@ -13,7 +13,9 @@ import json, sys, datetime, pathlib
 
 CODES = ["2330", "2454", "2308", "2317", "3711", "2881", "1303", "2303", "3037", "2383",
          "2882", "2382", "2891", "2412"]
-LIVE = pathlib.Path(__file__).resolve().parent.parent / "live.json"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+LIVE = ROOT / "live.json"
+BANDS = ROOT / "bands.json"  # 網站建置時寫入的五年評價區間（p25／p75 倍數）
 
 
 def num(x):
@@ -76,8 +78,42 @@ def daily(live, inp):
         ts = now()
         live["quotes"] = {"updatedAt": ts, "source": "臺灣證券交易所 每日收盤行情、個股本益比／淨值比（盤後）", "items": items}
         live["updatedAt"] = ts
+    if done:
+        events(live, inp, date, done)
     missing = [c for c in CODES if c not in done]
     return f"{date} 更新 {len(done)} 檔" + (f"，缺 {','.join(missing)}" if missing else "")
+
+
+def events(live, inp, date, codes):
+    """比對前一次的評價區，產生要推播的通知（推播由 GitHub Actions 的 notify 送出）。"""
+    bands = json.loads(BANDS.read_text(encoding="utf-8")) if BANDS.exists() else {}
+    zones, out = live.setdefault("zones", {}), []
+    for code in codes:
+        b, r, it = bands.get(code), inp["rows"][code], live["quotes"]["items"][code]
+        if not b:
+            continue
+        name, price = b["name"], it["price"]
+        mult = num(r.get(b["method"]))
+        zone = None if mult is None else ("低估" if mult < b["p25"] else "高估" if mult > b["p75"] else "合理")
+        prev = zones.get(code, {}).get("zone") or b.get("zone")
+        def add(kind, title, body):
+            out.append({"id": f"{code}-{kind}-{date}", "date": date, "code": code, "kind": kind,
+                        "title": f"{name} {code}　{title}", "body": body, "url": f"./#s{code}"})
+        if zone and zone != prev and zone == "低估":
+            add("buy", "進入參考買進區", f"收盤 {price:g}，{'本益比' if b['method'] == 'pe' else '淨值比'} {mult:g} 倍，低於五年區間的下四分之一。")
+        if zone and zone != prev and zone == "高估":
+            add("over", "進入高估區", f"收盤 {price:g}，{'本益比' if b['method'] == 'pe' else '淨值比'} {mult:g} 倍，高於五年區間的上四分之一。")
+        chg = it.get("change")
+        if chg is not None and price - chg > 0:
+            pct = chg / (price - chg) * 100
+            if abs(pct) >= 9.5:
+                add("limit", "收盤漲停" if pct > 0 else "收盤跌停", f"收盤 {price:g}，{'+' if pct > 0 else ''}{pct:.2f}%。")
+            elif abs(pct) >= 5:
+                add("move", "單日大漲" if pct > 0 else "單日大跌", f"收盤 {price:g}，{'+' if pct > 0 else ''}{pct:.2f}%。")
+        if zone:
+            zones[code] = {"zone": zone, "date": date}
+    old = [e for e in live.get("events", []) if e["id"] not in {x["id"] for x in out}]
+    live["events"] = (out + old)[:60]
 
 
 def monthly(live, inp):
