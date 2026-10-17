@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '7 9 * * 1-5'   # UTC 09:07 = 台北 17:07
   workflow_dispatch:
+    inputs:
+      date:
+        description: 測試用：指定交易日 YYYY-MM-DD（不 commit、不推播）
+        required: false
 permissions:
   contents: write
 concurrency:
@@ -16,8 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 抓盤後資料
+        env:
+          DATE: ${{ inputs.date }}
         run: cp live.json /tmp/old.json && python3 tools/daily.py
       - name: commit
+        if: ${{ !inputs.date }}
         run: |
           git config user.name Claude; git config user.email noreply@anthropic.com
           git add live.json
@@ -25,6 +32,7 @@ jobs:
           git commit -m "盤後資料 $(TZ=Asia/Taipei date +%F)"
           for i in 1 2 3; do git pull --rebase origin main && git push origin main && break; sleep 5; done
       - name: 推播新通知
+        if: ${{ !inputs.date }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}

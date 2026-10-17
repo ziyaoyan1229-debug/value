@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """每天收盤後：向證交所抓全市場盤後資料（STOCK_DAY_ALL、BWIBBU_d），只取網站上的股票，交給 update_live.py daily。
 在 GitHub Actions 上跑（.github/workflows/daily.yml）。數字照證交所原樣，抓不到就跳過。"""
-import datetime, json, pathlib, subprocess, sys
+import datetime, json, os, pathlib, subprocess, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from twse import get, col, roc_report
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 codes = set(json.loads((ROOT / "bands.json").read_text(encoding="utf-8")).keys())
 tz = datetime.timezone(datetime.timedelta(hours=8))
-today = datetime.datetime.now(tz).date()
+today = datetime.date.fromisoformat(os.environ["DATE"]) if os.environ.get("DATE") else datetime.datetime.now(tz).date()  # DATE＝測試用
 d8 = f"{today:%Y%m%d}"
 inp = {"today": f"{today:%Y-%m-%d}", "date": None, "rows": {}}
 
@@ -32,3 +32,6 @@ if a and a.get("stat") == "OK" and a.get("data"):
 print("資料日期", inp["date"], "抓到", len(inp["rows"]), "/", len(codes), "缺", sorted(codes - set(inp["rows"])), flush=True)
 p = pathlib.Path("/tmp/in.json"); p.write_text(json.dumps(inp, ensure_ascii=False), encoding="utf-8")
 subprocess.run([sys.executable, str(ROOT / "tools" / "update_live.py"), "daily", str(p)], check=True)
+if os.environ.get("DATE"):
+    lv = json.loads((ROOT / "live.json").read_text(encoding="utf-8"))
+    print("測試：quotes", len(lv["quotes"]["items"]), "valuation", len(lv.get("valuation", {})), "events", [e["id"] for e in lv.get("events", []) if e["date"] == inp["date"]])
