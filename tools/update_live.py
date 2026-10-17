@@ -84,6 +84,9 @@ def daily(live, inp):
     return f"{date} 更新 {len(done)} 檔" + (f"，缺 {','.join(missing)}" if missing else "")
 
 
+MN = {"pe": "本益比", "pb": "淨值比", "pd": "本利比"}
+
+
 def events(live, inp, date, codes):
     """比對前一次的評價區，產生要推播的通知（推播由 GitHub Actions 的 notify 送出）。"""
     bands = json.loads(BANDS.read_text(encoding="utf-8")) if BANDS.exists() else {}
@@ -93,16 +96,21 @@ def events(live, inp, date, codes):
         if not b:
             continue
         name, price = b["name"], it["price"]
-        mult = num(r.get(b["method"]))
+        if not b.get("method"):  # 加權指數：沒有評價區
+            mult = None
+        elif b["method"] == "pd":  # ETF：本利比＝收盤 ÷ 近 12 個月配息
+            mult = round(price / b["base"], 2) if b.get("base") else None
+        else:
+            mult = num(r.get(b["method"]))
         zone = None if mult is None else ("低估" if mult < b["p25"] else "高估" if mult > b["p75"] else "合理")
         prev = zones.get(code, {}).get("zone") or b.get("zone")
         def add(kind, title, body):
             out.append({"id": f"{code}-{kind}-{date}", "date": date, "code": code, "kind": kind,
                         "title": f"{name} {code}　{title}", "body": body, "url": f"./#s{code}"})
         if zone and zone != prev and zone == "低估":
-            add("buy", "進入參考買進區", f"收盤 {price:g}，{'本益比' if b['method'] == 'pe' else '淨值比'} {mult:g} 倍，低於五年區間的下四分之一。")
+            add("buy", "進入參考買進區", f"收盤 {price:g}，{MN[b['method']]} {mult:g} 倍，低於五年區間的下四分之一。")
         if zone and zone != prev and zone == "高估":
-            add("over", "進入高估區", f"收盤 {price:g}，{'本益比' if b['method'] == 'pe' else '淨值比'} {mult:g} 倍，高於五年區間的上四分之一。")
+            add("over", "進入高估區", f"收盤 {price:g}，{MN[b['method']]} {mult:g} 倍，高於五年區間的上四分之一。")
         chg = it.get("change")
         if chg is not None and price - chg > 0:
             pct = chg / (price - chg) * 100

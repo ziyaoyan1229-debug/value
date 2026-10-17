@@ -73,20 +73,21 @@ async function memo(key, ttl, fn) {
 }
 const UA = { 'user-agent': 'Mozilla/5.0 (value-taiwan-stock)', accept: 'application/json' };
 const nz = x => { const n = parseFloat(x); return isFinite(n) && n > 0 ? n : null; };
-const codesOf = u => [...new Set((u.searchParams.get('c') || '').split(',').filter(c => /^\d{4,6}[A-Z]?$/.test(c)))].slice(0, 80).sort();
+// TAIEX＝加權指數（基本市況報導代號 t00、Yahoo 代號 ^TWII）
+const codesOf = u => [...new Set((u.searchParams.get('c') || '').split(',').filter(c => /^(\d{4,6}[A-Z]?|TAIEX)$/.test(c)))].slice(0, 80).sort();
 async function realtime(codes) {
-  const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + codes.map(c => `tse_${c}.tw`).join('|'), { headers: UA });
+  const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + codes.map(c => `tse_${c === 'TAIEX' ? 't00' : c}.tw`).join('|'), { headers: UA });
   if (!r.ok) throw new Error('mis ' + r.status);
   const j = await r.json(), items = {};
   for (const m of j.msgArray || []) {
     const bid = nz(String(m.b || '').split('_')[0]), last = nz(m.z), y = nz(m.y);
     const d = String(m.d || ''), date = d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : null;
-    items[m.c] = { price: last || bid, last: !!last, prev: y, open: nz(m.o), high: nz(m.h), low: nz(m.l), volumeLots: nz(m.v), date, time: m.t || null };
+    items[m.c === 't00' ? 'TAIEX' : m.c] = { price: last || bid, last: !!last, prev: y, open: nz(m.o), high: nz(m.h), low: nz(m.l), volumeLots: nz(m.v), date, time: m.t || null };
   }
   return { at: new Date().toISOString(), source: '臺灣證券交易所 基本市況報導', items };
 }
 async function k5(code) {
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${code}.TW?interval=5m&range=1d`, { headers: UA });
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${code === 'TAIEX' ? '%5ETWII' : code + '.TW'}?interval=5m&range=1d`, { headers: UA });
   if (!r.ok) throw new Error('yahoo ' + r.status);
   const res = (await r.json()).chart?.result?.[0]; if (!res) throw new Error('yahoo empty');
   const q = res.indicators?.quote?.[0] || {}, ts = res.timestamp || [], bars = [];

@@ -24,6 +24,16 @@ if a and a.get("stat") == "OK" and t and t.get("data"):
         if r[ic] in codes:
             sign = "-" if isg is not None and "-" in re.sub(r"<[^>]*>", "", str(r[isg])) else ""
             inp["rows"][r[ic]] = {"open": r[io], "high": r[ih], "low": r[il], "close": r[icl], "change": sign + str(r[ich]).replace(",", ""), "volume_shares": r[iv]}
+    if "TAIEX" in codes:  # 加權指數：在同一份資料的「價格指數」表
+        for t2 in a.get("tables", []):
+            f2 = t2.get("fields") or []
+            i2, c2, s2, p2 = col(f2, "指數"), col(f2, "收盤指數"), col(f2, "漲跌(+/-)"), col(f2, "漲跌點數")
+            if None in (i2, c2, p2):
+                continue
+            for r in t2.get("data") or []:
+                if str(r[i2]).strip() == "發行量加權股價指數":
+                    sign = "-" if s2 is not None and "-" in re.sub(r"<[^>]*>", "", str(r[s2])) else ""
+                    inp["rows"]["TAIEX"] = {"close": r[c2], "change": sign + str(r[p2]).replace(",", "")}
     b = get(f"BWIBBU_d?date={d8}&selectType=ALL&response=json")
     if b and b.get("stat") == "OK" and b.get("data"):
         f = b["fields"]
