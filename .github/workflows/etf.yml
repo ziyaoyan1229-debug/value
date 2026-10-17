@@ -1,0 +1,28 @@
+# 抓 ETF 配息與加權指數歷史（證交所），寫進 data/hist/ 並 commit。手動執行。
+name: etf
+on:
+  workflow_dispatch:
+    inputs:
+      codes:
+        description: ETF 代號，空白分隔
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: data-write
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: 抓資料
+        run: python3 tools/fetch_etf.py ${{ inputs.codes }}
+      - name: commit
+        run: |
+          git config user.name Claude; git config user.email noreply@anthropic.com
+          git add data/hist
+          git diff --cached --quiet && exit 0
+          git commit -m "ETF 配息、加權指數歷史：${{ inputs.codes }}"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin main && break; sleep 5; done

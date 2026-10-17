@@ -6,7 +6,7 @@ _last = [0.0]
 
 
 def get(path, retries=4, gap=2.2):
-    url = BASE + path
+    url = path if path.startswith("http") else BASE + path
     for i in range(retries):
         wait = gap - (time.time() - _last[0])
         if wait > 0:
