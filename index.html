@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Value</title>
+<meta name="apple-mobile-web-app-title" content="Value">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0f14">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{color-scheme:dark}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0f14;color:#d9e2ec;font-family:"PingFang TC","Noto Sans TC",system-ui,sans-serif;text-align:center;padding:24px max(16px,env(safe-area-inset-left))}
+img{width:96px;height:96px;border-radius:22px}
+h1{font-size:28px;margin:16px 0 4px;color:#fff}
+p{margin:6px 0;color:#9aa7b4;line-height:1.7}
+a.btn{display:inline-block;margin-top:18px;padding:12px 22px;border-radius:10px;background:#16283a;border:1px solid #4a9eea;color:#fff;text-decoration:none;font-weight:700}
+ol{text-align:left;display:inline-block;margin:14px 0 0;padding-left:22px;color:#d9e2ec;line-height:1.9}
+</style>
+</head>
+<body>
+<main>
+  <img src="apple-touch-icon.png" alt="Value 圖示">
+  <h1>Value 價值台股</h1>
+  <p id="msg">把這頁加到主畫面，之後點圖示就會直接打開網站。</p>
+  <ol id="steps">
+    <li><b>iPhone（Safari）</b>：按下方「分享」→「加入主畫面」→「加入」</li>
+    <li><b>Android（Chrome）</b>：按右上角「⋮」→「加到主畫面」或「安裝應用程式」→「安裝」</li>
+  </ol>
+  <div><a class="btn" id="go" href="https://claude.ai/artifact/7S7dsYzAnTXhwCtAWc8cwB">直接打開網站</a></div>
+</main>
+<script>
+// 從主畫面打開時（standalone）直接跳到網站；用 Safari 打開時先顯示加入主畫面的步驟
+var SITE = 'https://claude.ai/artifact/7S7dsYzAnTXhwCtAWc8cwB';
+var standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+if (standalone) { document.getElementById('msg').textContent = '正在打開網站…'; document.getElementById('steps').hidden = true; location.replace(SITE); }
+</script>
+</body>
+</html>
