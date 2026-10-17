@@ -1,1 +1,11 @@
-{"updatedAt":null,"source":"","quotes":null,"valuation":{},"market":null,"briefs":{}}
+{
+ "updatedAt": null,
+ "source": "",
+ "quotes": null,
+ "valuation": {},
+ "market": {
+  "date": "2026-10-17",
+  "open": false
+ },
+ "briefs": {}
+}
