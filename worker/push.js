@@ -91,8 +91,10 @@ export default {
       if (p === '/unsub' && req.method === 'POST') { const d = await req.json(); if (d && d.endpoint) await env.SUBS.delete(await idOf(d.endpoint)); return json({ ok: true }); }
       if (p === '/send' && req.method === 'POST') {
         if (!authed(req, env)) return json({ error: 'unauthorized' }, 401);
+        // 免費方案每次呼叫的 CPU 時間有限，一次只處理一批裝置；notify.yml 用 start 往下一批，直到 next 為 null
         const d = await req.json(), items = (d.items || []).slice(0, 50);
-        const v = await vapid(env), subs = await allSubs(env);
+        const start = Math.max(0, +d.start || 0), size = Math.min(50, Math.max(1, +d.size || 25));
+        const v = await vapid(env), all = await allSubs(env), subs = all.slice(start, start + size);
         let sent = 0, gone = 0, failed = 0;
         for (const [k, r] of subs) {
           const mine = items.filter(m => (!m.code || (r.codes || []).includes(m.code)) && (!m.kind || (r.types || {})[m.kind])).slice(0, 10);
@@ -104,7 +106,7 @@ export default {
             } catch (e) { failed++; }
           }
         }
-        return json({ sent, gone, failed, subs: subs.length });
+        return json({ sent, gone, failed, subs: all.length, next: start + size < all.length ? start + size - gone : null });
       }
       if (p === '/stats') { if (!authed(req, env)) return json({ error: 'unauthorized' }, 401); return json({ subs: (await allSubs(env)).length }); }
       return json({ name: 'Value push', ok: true });
