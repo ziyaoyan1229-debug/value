@@ -4,7 +4,6 @@
 //   GET  /vapid                          → { key }：給網站訂閱用的公鑰
 //   POST /sub   { sub, codes, types }    → 登記或更新一台裝置（codes＝要追蹤的股票代號，types＝{ buy, over, move } 要收的通知）
 //   POST /unsub { endpoint }             → 取消
-//   POST /test  { endpoint }             → 推一則測試通知給這台
 //   POST /send  Authorization: Bearer <PUSH_KEY>  { items: [{ code, kind, title, body, url, tag }] }
 //               → 推給有追蹤該股票、有開該類通知的裝置；回 { sent, gone, failed, subs }
 //   GET  /stats Authorization: Bearer <PUSH_KEY>  → { subs }
@@ -78,15 +77,6 @@ export default {
         const rec = { sub: { endpoint: s.endpoint, keys: { p256dh: s.keys.p256dh, auth: s.keys.auth } }, codes, types, at: Date.now() };
         await env.SUBS.put(await idOf(s.endpoint), JSON.stringify(rec));
         return json({ ok: true, codes: codes.length });
-      }
-      if (p === '/test' && req.method === 'POST') {   // 網站的「發測試通知」：只推給這一台，20 秒最多一次
-        const d = await req.json(), k = d && d.endpoint && await idOf(d.endpoint), r = k && await env.SUBS.get(k, 'json');
-        if (!r) return json({ error: 'not subscribed' }, 404);
-        if (Date.now() - (r.test || 0) < 20000) return json({ error: 'too soon' }, 429);
-        r.test = Date.now(); await env.SUBS.put(k, JSON.stringify(r));
-        const res = await pushOne(await vapid(env), r.sub, { title: '✅ 價值台股測試通知', body: '收到這則就代表手機推播正常，網站關著也收得到。', url: './', tag: 'value-test' });
-        if (res.status === 404 || res.status === 410) { await env.SUBS.delete(k); return json({ error: 'gone' }, 410); }
-        return json({ ok: res.ok, status: res.status });
       }
       if (p === '/unsub' && req.method === 'POST') { const d = await req.json(); if (d && d.endpoint) await env.SUBS.delete(await idOf(d.endpoint)); return json({ ok: true }); }
       if (p === '/send' && req.method === 'POST') {

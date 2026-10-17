@@ -1,18 +1,13 @@
 # 部署價值台股的背景推播後端（worker/push.js）到 Cloudflare Workers 免費方案：iPhone 主畫面 App、Android、電腦，網站關著也收得到通知。
 # 需要 GitHub secrets：CF_API_TOKEN（Cloudflare「Edit Cloudflare Workers」範本建的 API Token，可以和 coin-app 共用）、CF_ACCOUNT_ID。
 # 發送用密鑰 PUSH_KEY 由 CF_API_TOKEN 算出（notify.yml 用同一個算法），不用另外設。
-# 改到 worker/ 時自動重新部署；手動執行可勾「發一則測試通知」給所有已開啟推播的裝置。
+# 改到 worker/ 時自動重新部署，也可以手動執行。
 name: push
 on:
   push:
     branches: [main]
     paths: ['worker/**', '.github/workflows/push.yml']
   workflow_dispatch:
-    inputs:
-      test:
-        description: 部署後發一則測試通知
-        type: boolean
-        default: true
 concurrency:
   group: push
   cancel-in-progress: false
@@ -31,7 +26,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.test && '1' || '' }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo '還沒設定 CF_API_TOKEN／CF_ACCOUNT_ID，跳過'; exit 0; fi
           API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
@@ -58,7 +52,3 @@ jobs:
           echo "### 推播後端：$URL" >> "$GITHUB_STEP_SUMMARY"
           for i in $(seq 1 24); do curl -fsS "$URL/vapid" > /dev/null 2>&1 && { echo '後端正常'; break; }; sleep 10; done
           echo "已訂閱裝置：$(curl -sS -H "Authorization: Bearer $KEY" "$URL/stats")"
-          if [ -n "$TEST" ]; then
-            curl -fsS -X POST -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
-              -d '{"items":[{"title":"✅ 價值台股背景推播測試","body":"收到這則就代表網站關著也能收到通知了。","url":"./","tag":"value-test"}]}' "$URL/send"; echo
-          fi
