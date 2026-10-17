@@ -11,11 +11,11 @@
 """
 import json, sys, datetime, pathlib
 
-CODES = ["2330", "2454", "2308", "2317", "3711", "2881", "1303", "2303", "3037", "2383",
-         "2882", "2382", "2891", "2412"]
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LIVE = ROOT / "live.json"
 BANDS = ROOT / "bands.json"  # 網站建置時寫入的五年評價區間（p25／p75 倍數）
+# 要更新的股票＝網站上有五年資料的那些（bands.json 的鍵）
+CODES = list(json.loads(BANDS.read_text(encoding="utf-8")).keys()) if BANDS.exists() else []
 
 
 def num(x):

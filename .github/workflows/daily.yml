@@ -1,0 +1,31 @@
+# 每個交易日收盤後（台北 17:07）抓證交所盤後資料更新 live.json，並把新的通知推到手機。
+name: daily
+on:
+  schedule:
+    - cron: '7 9 * * 1-5'   # UTC 09:07 = 台北 17:07
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-write
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 抓盤後資料
+        run: cp live.json /tmp/old.json && python3 tools/daily.py
+      - name: commit
+        run: |
+          git config user.name Claude; git config user.email noreply@anthropic.com
+          git add live.json
+          git diff --cached --quiet && { echo 沒有變更; exit 0; }
+          git commit -m "盤後資料 $(TZ=Asia/Taipei date +%F)"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin main && break; sleep 5; done
+      - name: 推播新通知
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: bash scripts/notify.sh /tmp/old.json live.json

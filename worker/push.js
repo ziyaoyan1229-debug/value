@@ -73,7 +73,7 @@ async function memo(key, ttl, fn) {
 }
 const UA = { 'user-agent': 'Mozilla/5.0 (value-taiwan-stock)', accept: 'application/json' };
 const nz = x => { const n = parseFloat(x); return isFinite(n) && n > 0 ? n : null; };
-const codesOf = u => [...new Set((u.searchParams.get('c') || '').split(',').filter(c => /^\d{4,6}[A-Z]?$/.test(c)))].slice(0, 30).sort();
+const codesOf = u => [...new Set((u.searchParams.get('c') || '').split(',').filter(c => /^\d{4,6}[A-Z]?$/.test(c)))].slice(0, 80).sort();
 async function realtime(codes) {
   const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + codes.map(c => `tse_${c}.tw`).join('|'), { headers: UA });
   if (!r.ok) throw new Error('mis ' + r.status);

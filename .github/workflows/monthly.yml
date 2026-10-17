@@ -1,0 +1,26 @@
+# 每月 3 日（台北 18:40）補上個月的河流圖月資料，1、4、7、10 月另加季快照。
+name: monthly
+on:
+  schedule:
+    - cron: '40 10 3 * *'   # UTC 10:40 = 台北 18:40
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: data-write
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: 抓月資料
+        run: python3 tools/monthly.py
+      - name: commit
+        run: |
+          git config user.name Claude; git config user.email noreply@anthropic.com
+          git add live.json
+          git diff --cached --quiet && { echo 沒有變更; exit 0; }
+          git commit -m "河流圖月資料 $(TZ=Asia/Taipei date -d '-1 month' +%Y-%m)"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin main && break; sleep 5; done

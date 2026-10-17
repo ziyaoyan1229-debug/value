@@ -1,4 +1,4 @@
-# 盤後更新（排程推上新的 live.json）後，把這次新產生的通知推到有開推播的手機。
+# 手動推上新的 live.json 後（GitHub 排程 daily.yml 自己會推播，不靠這個），把這次新產生的通知推到有開推播的手機。
 # 只推 live.json 裡這次 commit 新增的 events，每台裝置只收它追蹤的股票和勾選的類型（由 worker 過濾）。
 name: notify
 on:
@@ -22,16 +22,5 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo '還沒設定 CF_API_TOKEN／CF_ACCOUNT_ID，跳過'; exit 0; fi
           git show HEAD~1:live.json > /tmp/old.json 2>/dev/null || echo '{}' > /tmp/old.json
-          node scripts/new_events.mjs /tmp/old.json live.json > /tmp/items.json
-          N=$(jq '.items | length' /tmp/items.json); echo "新通知 $N 則"
-          [ "$N" -gt 0 ] || exit 0
-          SUB=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain')
-          KEY="$(printf '%s' "${CLOUDFLARE_API_TOKEN}value-push" | sha256sum | cut -d' ' -f1)"
-          START=0
-          while [ "$START" != null ]; do   # 一批 25 台裝置，避免超過 Cloudflare 免費方案的 CPU 時間
-            jq --argjson s "$START" '. + {start: $s, size: 25}' /tmp/items.json > /tmp/batch.json
-            R=$(curl -fsS -X POST -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' --data @/tmp/batch.json "https://value-push.$SUB.workers.dev/send"); echo "$R"
-            START=$(echo "$R" | jq -r '.next')
-          done
+          bash scripts/notify.sh /tmp/old.json live.json
