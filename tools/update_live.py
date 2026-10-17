@@ -107,7 +107,7 @@ def events(live, inp, date, codes):
         if chg is not None and price - chg > 0:
             pct = chg / (price - chg) * 100
             if abs(pct) >= 9.5:
-                add("limit", "收盤漲停" if pct > 0 else "收盤跌停", f"收盤 {price:g}，{'+' if pct > 0 else ''}{pct:.2f}%。")
+                add("limit" if pct > 0 else "limitdn", "收盤漲停" if pct > 0 else "收盤跌停", f"收盤 {price:g}，{'+' if pct > 0 else ''}{pct:.2f}%。")
             elif abs(pct) >= 5:
                 add("move", "單日大漲" if pct > 0 else "單日大跌", f"收盤 {price:g}，{'+' if pct > 0 else ''}{pct:.2f}%。")
         if zone:

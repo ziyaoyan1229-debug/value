@@ -2,7 +2,7 @@
 // 由 .github/workflows/push.yml 自動部署；KV（SUBS）存訂閱與 VAPID 金鑰（第一次用到時自動產生），PUSH_KEY 是發送用密鑰（部署時設定）。
 // 加密與 VAPID 的做法和 coin-app 的 worker/push.js 相同。
 //   GET  /vapid                          → { key }：給網站訂閱用的公鑰
-//   POST /sub   { sub, codes, types }    → 登記或更新一台裝置（codes＝要追蹤的股票代號，types＝{ buy, over, move } 要收的通知）
+//   POST /sub   { sub, codes, types }    → 登記或更新一台裝置（codes＝要追蹤的股票代號，types＝{ buy, over, move, limit, limitdn } 要收的通知）
 //   POST /unsub { endpoint }             → 取消
 //   POST /send  Authorization: Bearer <PUSH_KEY>  { items: [{ code, kind, title, body, url, tag }] }
 //               → 推給有追蹤該股票、有開該類通知的裝置；回 { sent, gone, failed, subs }
@@ -63,7 +63,7 @@ async function allSubs(env) {
   do { const r = await env.SUBS.list({ prefix: 'sub:', cursor }); for (const k of r.keys) { const v = await env.SUBS.get(k.name, 'json'); if (v) out.push([k.name, v]); } cursor = r.list_complete ? null : r.cursor; } while (cursor);
   return out;
 }
-const KINDS = ['buy', 'over', 'move', 'limit'];
+const KINDS = ['buy', 'over', 'move', 'limit', 'limitdn'];
 // 證交所和 Yahoo 都不讓網頁直接抓，所以這裡轉一手；只放在記憶體裡短暫共用，不寫 KV
 const MEMO = new Map();
 async function memo(key, ttl, fn) {
