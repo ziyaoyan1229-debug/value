@@ -302,10 +302,11 @@
  },
  "TAIEX": {
   "name": "加權指數",
-  "method": null,
-  "p25": null,
-  "p75": null,
-  "zone": null
+  "method": "pe",
+  "p25": 15.2,
+  "p75": 22.02,
+  "zone": "高估",
+  "base": 1867.27
  },
  "0050": {
   "name": "元大台灣50",

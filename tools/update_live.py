@@ -98,7 +98,7 @@ def events(live, inp, date, codes):
         name, price = b["name"], it["price"]
         if not b.get("method"):  # 加權指數：沒有評價區
             mult = None
-        elif b["method"] == "pd":  # ETF：本利比＝收盤 ÷ 近 12 個月配息
+        elif b["method"] == "pd" or code == "TAIEX":  # ETF：本利比＝收盤 ÷ 近 12 個月配息；指數：點數 ÷ 隱含每股盈餘
             mult = round(price / b["base"], 2) if b.get("base") else None
         else:
             mult = num(r.get(b["method"]))
