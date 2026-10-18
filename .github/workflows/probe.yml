@@ -1,0 +1,15 @@
+# 手動：印出幾個公開資料網址的內容，確認格式（不改任何檔案）
+name: probe
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 網址，空白分隔
+        required: true
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/probe.py ${{ inputs.urls }}
