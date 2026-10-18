@@ -1,0 +1,10 @@
+# 手動：用公開個股資料自己算大盤本益比，跟證交所月報比（只印結果，不改檔案）
+name: mktpe
+on: workflow_dispatch
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/mktpe.py
