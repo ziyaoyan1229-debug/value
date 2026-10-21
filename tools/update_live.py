@@ -52,9 +52,24 @@ def by_date(items, new):
     return [m[k] for k in sorted(m)]
 
 
+def exdiv(live, new, today):
+    """除權息行事曆：證交所預告（TWT48U）。已過的日子留 30 天，讓剛除息的也看得到。"""
+    keep = (datetime.date.fromisoformat(today) - datetime.timedelta(days=30)).isoformat()
+    old = [x for x in (live.get("exdiv") or {}).get("items", []) if keep <= x["date"] < today]
+    seen = {(x["code"], x["date"]) for x in new}
+    items = [x for x in old if (x["code"], x["date"]) not in seen] + new
+    for x in items:
+        for k in ("cash", "stock"):
+            x[k] = num(x.get(k)) or None
+    live["exdiv"] = {"updatedAt": now(), "source": "臺灣證券交易所 除權除息預告表（TWT48U）",
+                     "items": sorted(items, key=lambda x: (x["date"], x["code"]))}
+
+
 def daily(live, inp):
     today, date = inp["today"], inp.get("date")
     live["market"] = {"date": today, "open": bool(date) and date == today}
+    if inp.get("exdiv") is not None:
+        exdiv(live, inp["exdiv"], today)
     if not date or date != today:
         return "休市或證交所還沒有今天的資料，只更新開盤狀態"
     q = live.get("quotes") or {}

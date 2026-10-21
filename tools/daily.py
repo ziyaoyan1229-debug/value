@@ -42,6 +42,16 @@ if a and a.get("stat") == "OK" and t and t.get("data"):
             if r[ic] in inp["rows"]:
                 pe = r[ipe]
                 inp["rows"][r[ic]].update({"pe": None if str(pe).strip() in ("-", "") else pe, "pb": r[ipb], "yield": r[iy], "report": roc_report(r[ir]) if ir is not None else None})
+x = get("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL")  # 除權除息預告（休市也抓）
+if isinstance(x, list):
+    inp["exdiv"] = []
+    for r in x:
+        c, dt = str(r.get("Code", "")).strip(), str(r.get("Date", "")).strip()
+        if c in codes and len(dt) == 7:
+            inp["exdiv"].append({"code": c, "name": r.get("Name"), "date": f"{int(dt[:3]) + 1911}-{dt[3:5]}-{dt[5:]}",
+                                 "type": r.get("Exdividend"), "cash": r.get("CashDividend") or None,
+                                 "stock": r.get("StockDividendRatio") or None})
+    print("除權息預告", len(x), "筆，網站股票", len(inp["exdiv"]), flush=True)
 print("資料日期", inp["date"], "抓到", len(inp["rows"]), "/", len(codes), "缺", sorted(codes - set(inp["rows"])), flush=True)
 p = pathlib.Path("/tmp/in.json"); p.write_text(json.dumps(inp, ensure_ascii=False), encoding="utf-8")
 subprocess.run([sys.executable, str(ROOT / "tools" / "update_live.py"), "daily", str(p)], check=True)
