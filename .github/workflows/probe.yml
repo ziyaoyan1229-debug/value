@@ -12,6 +12,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tools/probe.py $URLS
+      - run: if echo "$URLS" | grep -q "^api:"; then python3 tools/probe_api.py ${URLS#api:}; else python3 tools/probe.py $URLS; fi
         env:
           URLS: ${{ inputs.urls }}
