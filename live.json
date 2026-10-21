@@ -2087,10 +2087,7 @@
    ]
   }
  },
- "market": {
-  "date": "2026-10-22",
-  "open": false
- },
+ "market": {"date": "2026-10-21", "open": true},
  "briefs": {},
  "zones": {
   "2330": {

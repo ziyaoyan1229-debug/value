@@ -67,7 +67,9 @@ def exdiv(live, new, today):
 
 def daily(live, inp):
     today, date = inp["today"], inp.get("date")
-    live["market"] = {"date": today, "open": bool(date) and date == today}
+    early = date != today and datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).hour < 14
+    if not early:  # 收盤前手動跑、還沒資料，不要把今天標成休市
+        live["market"] = {"date": today, "open": bool(date) and date == today}
     if inp.get("exdiv") is not None:
         exdiv(live, inp["exdiv"], today)
     if not date or date != today:
