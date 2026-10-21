@@ -34,6 +34,34 @@ if last.month in (1, 4, 7, 10):
                                                   "pb": r[ipb], "yield": r[iy], "report": roc_report(r[ir]) if ir is not None else None}
             break
         day -= datetime.timedelta(days=1)
+# ETF：上個月的除息（除權除息計算結果表 TWT49U），網頁用來重算近 12 個月配息和本利比河流帶
+etfs = [c for c in codes if c.startswith("0")]
+if etfs:
+    j = get(f"https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate={last:%Y%m}01&endDate={last:%Y%m%d}&response=json")
+    if j and j.get("stat") == "OK" and j.get("data"):
+        f = j["fields"]; i0, ic, iv, it = col(f, "資料日期"), col(f, "股票代號"), col(f, "權值+息值", "權值"), col(f, "權/息")
+        for r in j["data"]:
+            c = str(r[ic]).strip()
+            if c in etfs and (it is None or "息" in str(r[it])) and num(r[iv]):
+                d = str(r[i0]).strip()  # 115年07月21日 或 115/07/21
+                y, mm, dd = [int(x) for x in d.replace("年", "/").replace("月", "/").replace("日", "").split("/")]
+                inp["rows"].setdefault(c, {}).setdefault("divs", []).append({"date": f"{y + 1911:04d}-{mm:02d}-{dd:02d}", "cash": num(r[iv])})
+    print("ETF 除息", {c: inp["rows"].get(c, {}).get("divs") for c in etfs}, flush=True)
+# 加權指數：上個月的最高、最低、月平均收盤（MI_5MINS_HIST），加上 mkt.yml 每月 1 日算好的大盤本益比（data/hist/mkt-pe.json）
+if "TAIEX" in codes:
+    j = get(f"https://www.twse.com.tw/rwd/zh/TAIEX/MI_5MINS_HIST?date={last:%Y%m}01&response=json")
+    if j and j.get("stat") == "OK" and j.get("data"):
+        f = j["fields"]; ih, il, ic = col(f, "最高"), col(f, "最低"), col(f, "收盤")
+        rows = [r for r in j["data"] if num(r[ic])]
+        if rows:
+            inp["rows"]["TAIEX"] = {"high": max(num(r[ih]) for r in rows), "low": min(num(r[il]) for r in rows),
+                                    "avg": round(sum(num(r[ic]) for r in rows) / len(rows), 2)}
+    mp = ROOT / "data" / "hist" / "mkt-pe.json"
+    if mp.exists():
+        mk = [r for r in json.loads(mp.read_text(encoding="utf-8")).get("monthly", []) if r["ym"] == ym]
+        if mk:
+            inp["rows"].setdefault("TAIEX", {})["mkt"] = mk[0]
+    print("TAIEX", inp["rows"].get("TAIEX"), flush=True)
 print(ym, "月資料", len(inp["rows"]), "/", len(codes), "季快照", sum(1 for r in inp["rows"].values() if "snap" in r), flush=True)
 p = pathlib.Path("/tmp/in.json"); p.write_text(json.dumps(inp, ensure_ascii=False), encoding="utf-8")
 subprocess.run([sys.executable, str(ROOT / "tools" / "update_live.py"), "monthly", str(p)], check=True)

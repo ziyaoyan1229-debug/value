@@ -46,6 +46,12 @@ def by_month(items, key, new):
     return [m[k] for k in sorted(m)]
 
 
+def by_date(items, new):
+    m = {x["date"]: x for x in items if x.get("date")}
+    m[new["date"]] = new
+    return [m[k] for k in sorted(m)]
+
+
 def daily(live, inp):
     today, date = inp["today"], inp.get("date")
     live["market"] = {"date": today, "open": bool(date) and date == today}
@@ -138,6 +144,10 @@ def monthly(live, inp):
             if r.get("source"):
                 row["source"] = r["source"]
             v["monthly"] = by_month(v.get("monthly", []), "ym", row)
+        for d in r.get("divs") or []:  # ETF 除息
+            v["dividends"] = by_date(v.get("dividends", []), d)
+        if r.get("mkt"):  # 加權指數的大盤本益比
+            v["mkt"] = by_month(v.get("mkt", []), "ym", r["mkt"])
         s = r.get("snap")
         if s and num(s.get("close")) and num(s.get("pb")) and ym[5:] in ("01", "04", "07", "10"):
             snap = {"date": s["date"], "close": num(s["close"]), "pe": num(s.get("pe")), "pb": num(s["pb"]),
