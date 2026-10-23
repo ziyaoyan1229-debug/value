@@ -2284,8 +2284,8 @@
   }
  },
  "market": {
-  "date": "2026-10-22",
-  "open": true
+  "date": "2026-10-23",
+  "open": false
  },
  "briefs": {},
  "zones": {
@@ -2615,7 +2615,7 @@
   }
  ],
  "exdiv": {
-  "updatedAt": "2026-10-22 17:38",
+  "updatedAt": "2026-10-23 17:37",
   "source": "臺灣證券交易所 除權除息預告表（TWT48U）",
   "items": [
    {
