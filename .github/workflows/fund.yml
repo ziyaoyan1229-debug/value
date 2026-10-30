@@ -5,6 +5,7 @@ on:
   schedule:
     - cron: '0 11 11 * *'
     - cron: '0 2 * * 6'
+    - cron: '0 12 1-20 3,5,8,11 *'  # 財報公布季：每天抓，新一季的毛利率才會馬上更新
 permissions:
   contents: write
 concurrency:
