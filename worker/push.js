@@ -82,7 +82,7 @@ async function realtime(codes) {
     const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + ex.slice(i, i + 50).join('|'), { headers: UA });
     if (!r.ok) throw new Error('mis ' + r.status);
     const j = await r.json();
-    for (const m of j.msgArray || []) {
+    for (const m of (j.msgArray || []).filter(m => m.c)) {
       const bid = nz(String(m.b || '').split('_')[0]), last = nz(m.z), y = nz(m.y);
       const d = String(m.d || ''), date = d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : null;
       items[m.c === 't00' ? 'TAIEX' : m.c] = { price: last || bid, last: !!last, prev: y, open: nz(m.o), high: nz(m.h), low: nz(m.l), volumeLots: nz(m.v), date, time: m.t || null, market: m.ex === 'otc' ? '上櫃' : '上市' };
@@ -90,8 +90,8 @@ async function realtime(codes) {
   }
   return { at: new Date().toISOString(), source: '臺灣證券交易所 基本市況報導', items };
 }
-async function k5one(sym) {
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=5m&range=1d`, { headers: UA });
+async function k5one(sym, iv = '5m', range = '1d') {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${iv}&range=${range}`, { headers: UA });
   if (!r.ok) throw new Error('yahoo ' + r.status);
   const res = (await r.json()).chart?.result?.[0]; if (!res) throw new Error('yahoo empty');
   const q = res.indicators?.quote?.[0] || {}, ts = res.timestamp || [], bars = [];
@@ -127,6 +127,10 @@ export default {
       if (p === '/k5' && req.method === 'GET') {
         const c = codesOf(u)[0]; if (!c) return json({ error: 'no code' }, 400);
         return json(await memo('k5:' + c, 60000, () => k5(c)));
+      }
+      if (p === '/kd' && req.method === 'GET') { // 上櫃股票的日 K（證交所網站沒有上櫃個股日成交），Yahoo .TWO 近兩年
+        const c = codesOf(u)[0]; if (!c || c === 'TAIEX') return json({ error: 'no code' }, 400);
+        return json(await memo('kd:' + c, 30 * 60e3, () => k5one(c + '.TWO', '1d', '2y')));
       }
       if (p === '/unsub' && req.method === 'POST') { const d = await req.json(); if (d && d.endpoint) await env.SUBS.delete(await idOf(d.endpoint)); return json({ ok: true }); }
       if (p === '/send' && req.method === 'POST') {

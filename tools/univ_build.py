@@ -175,7 +175,10 @@ src = "臺灣證券交易所（每日收盤行情、個股本益比、公司基�
 (U / "all.json").write_text(json.dumps({"updated": datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M"), "source": src,
                                         "fields": ["名稱", "市場", "產業", "收盤", "漲跌", "本益比", "淨值比", "殖利率", "日期"],
                                         "items": alli}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-(U / "recent.json").write_text(json.dumps({"updated": datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M"), "items": rec_out["items"]},
+# 近 20 日收盤：日期只列一次，每檔一排收盤價（沒交易的那天是 null），檔案小一半
+rdays = sorted({d for v in rec_out["items"].values() for d, _ in v})[-20:]
+ritems = {c: [dict(v).get(d) for d in rdays] for c, v in rec_out["items"].items()}
+(U / "recent.json").write_text(json.dumps({"updated": datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M"), "days": rdays, "items": ritems},
                                           ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 # 每日收盤只留最近兩個月，舊月份拿掉省空間
 keep = (today.replace(day=1) - datetime.timedelta(days=40)).strftime("%Y-%m")
