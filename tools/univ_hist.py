@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""全部上市櫃股票的歷史資料（給網站「任何股票都能查」用），一個市場、一年一次跑：
+"""全部上市櫃股票的歷史資料（每天盤後 daily.yml 也會跑今年，只補新的交易日）（給網站「任何股票都能查」用），一個市場、一年一次跑：
   python3 tools/univ_hist.py twse 2023     （上市：證交所每日收盤行情 MI_INDEX、個股本益比 BWIBBU_d）
   python3 tools/univ_hist.py tpex 2023     （上櫃：櫃買中心上櫃股票行情 dailyQuotes、本益比 peQryDate）
 每天抓一次全市場收盤行情，整理成每月一份：data/u/m/{年-月}.{市場}.json
@@ -85,8 +85,15 @@ for m in range(1, 13):
     if p.exists() and json.loads(p.read_text(encoding="utf-8")).get("complete"):
         print("已完成", p.name, flush=True)
         continue
-    rows, days, closes = {}, [], {}
-    d = first
+    rows, days, closes, d = {}, [], {}, first
+    if p.exists():  # 這個月抓過一部分（每天盤後更新）：從上次最後一天的隔天接著抓
+        o = json.loads(p.read_text(encoding="utf-8"))
+        if o.get("days"):
+            days = o["days"]
+            rows = {c: [x[0], x[1], x[2], x[3], x[4], x[5]] for c, x in o["rows"].items()}
+            closes = {c: {dd: v for dd, v in zip(days, arr) if v} for c, arr in (o.get("closes") or {}).items()}
+            d = datetime.date.fromisoformat(days[-1]) + datetime.timedelta(days=1)
+    n0 = len(days)
     while d < nxt and d <= today:
         if d.weekday() < 5:
             r = day_rows(d)
@@ -101,6 +108,9 @@ for m in range(1, 13):
                     if first >= recent_from:
                         closes.setdefault(c, {})[days[-1]] = cl
         d += datetime.timedelta(days=1)
+    if n0 and len(days) == n0 and not nxt <= today:
+        print("沒有新的交易日", p.name, flush=True)
+        continue
     out = {"ym": f"{first:%Y-%m}", "market": mkt, "days": days, "complete": nxt <= today,
            "rows": {c: [x[0], x[1], round(x[2]), round(x[3]), x[4], x[5]] for c, x in rows.items()}}
     if closes:

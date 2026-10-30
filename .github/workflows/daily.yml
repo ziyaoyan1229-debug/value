@@ -37,3 +37,24 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         run: bash scripts/notify.sh /tmp/old.json live.json
+  # 全部上市櫃股票（網站「任何股票都能查」）：補今天的收盤和本益比，更新搜尋用的清單；每檔的河流圖每月 3 日由 univ.yml 重做
+  univ:
+    needs: update
+    if: ${{ !inputs.date }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: 抓全部股票今天的行情
+        run: |
+          Y=$(TZ=Asia/Taipei date +%Y)
+          python3 tools/univ_hist.py twse $Y
+          python3 tools/univ_hist.py tpex $Y
+          python3 tools/univ_build.py --index
+      - name: commit
+        run: |
+          git config user.name Claude; git config user.email noreply@anthropic.com
+          git add data/u/m data/u/all.json data/u/recent.json
+          git diff --cached --quiet && { echo 沒有變更; exit 0; }
+          git commit -m "全部股票盤後資料 $(TZ=Asia/Taipei date +%F)"
+          for i in 1 2 3 4 5; do git pull --rebase origin main && git push origin main && break; sleep $((i*5)); done

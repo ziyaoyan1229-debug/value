@@ -75,24 +75,34 @@ const UA = { 'user-agent': 'Mozilla/5.0 (value-taiwan-stock)', accept: 'applicat
 const nz = x => { const n = parseFloat(x); return isFinite(n) && n > 0 ? n : null; };
 // TAIEX＝加權指數（基本市況報導代號 t00、Yahoo 代號 ^TWII）
 const codesOf = u => [...new Set((u.searchParams.get('c') || '').split(',').filter(c => /^(\d{4,6}[A-Z]?|TAIEX)$/.test(c)))].slice(0, 80).sort();
+// 上櫃股票（otc_）和上市（tse_）一起查，查不到的那一邊基本市況報導會直接略過；一次最多 50 個，分批查
 async function realtime(codes) {
-  const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + codes.map(c => `tse_${c === 'TAIEX' ? 't00' : c}.tw`).join('|'), { headers: UA });
-  if (!r.ok) throw new Error('mis ' + r.status);
-  const j = await r.json(), items = {};
-  for (const m of j.msgArray || []) {
-    const bid = nz(String(m.b || '').split('_')[0]), last = nz(m.z), y = nz(m.y);
-    const d = String(m.d || ''), date = d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : null;
-    items[m.c === 't00' ? 'TAIEX' : m.c] = { price: last || bid, last: !!last, prev: y, open: nz(m.o), high: nz(m.h), low: nz(m.l), volumeLots: nz(m.v), date, time: m.t || null };
+  const ex = codes.flatMap(c => c === 'TAIEX' ? ['tse_t00.tw'] : /^\d{4}$/.test(c) ? [`tse_${c}.tw`, `otc_${c}.tw`] : [`tse_${c}.tw`]), items = {};
+  for (let i = 0; i < ex.length; i += 50) {
+    const r = await fetch('https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + ex.slice(i, i + 50).join('|'), { headers: UA });
+    if (!r.ok) throw new Error('mis ' + r.status);
+    const j = await r.json();
+    for (const m of j.msgArray || []) {
+      const bid = nz(String(m.b || '').split('_')[0]), last = nz(m.z), y = nz(m.y);
+      const d = String(m.d || ''), date = d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : null;
+      items[m.c === 't00' ? 'TAIEX' : m.c] = { price: last || bid, last: !!last, prev: y, open: nz(m.o), high: nz(m.h), low: nz(m.l), volumeLots: nz(m.v), date, time: m.t || null, market: m.ex === 'otc' ? '上櫃' : '上市' };
+    }
   }
   return { at: new Date().toISOString(), source: '臺灣證券交易所 基本市況報導', items };
 }
-async function k5(code) {
-  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${code === 'TAIEX' ? '%5ETWII' : code + '.TW'}?interval=5m&range=1d`, { headers: UA });
+async function k5one(sym) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=5m&range=1d`, { headers: UA });
   if (!r.ok) throw new Error('yahoo ' + r.status);
   const res = (await r.json()).chart?.result?.[0]; if (!res) throw new Error('yahoo empty');
   const q = res.indicators?.quote?.[0] || {}, ts = res.timestamp || [], bars = [];
   ts.forEach((t, i) => { if (q.open?.[i] != null && q.close?.[i] != null) bars.push([t, q.open[i], q.high[i], q.low[i], q.close[i], q.volume?.[i] || 0]); });
   return { at: new Date().toISOString(), source: 'Yahoo Finance', prev: res.meta?.chartPreviousClose ?? res.meta?.previousClose ?? null, bars };
+}
+// 上市用 .TW，查不到再試上櫃的 .TWO
+async function k5(code) {
+  if (code === 'TAIEX') return k5one('%5ETWII');
+  try { const a = await k5one(code + '.TW'); if (a.bars.length || a.prev) return a; } catch (e) { }
+  return k5one(code + '.TWO');
 }
 
 export default {

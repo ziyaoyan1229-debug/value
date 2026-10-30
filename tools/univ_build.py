@@ -48,6 +48,37 @@ def industries():
     return out
 
 
+def divs():
+    """上市股票的除權息還原因子（證交所除權除息計算結果表 TWT49U），和網站內建股票的含息報酬同算法"""
+    out, ok = {}, False
+    for y in range(today.year - 5, today.year + 1):
+        end = min(datetime.date(y, 12, 31), today)
+        j = get(f"https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate={y}0101&endDate={end:%Y%m%d}&response=json")
+        if not (isinstance(j, dict) and j.get("stat") == "OK" and j.get("data")):
+            print("TWT49U 抓不到", y, flush=True)
+            continue
+        ok = True
+        f = j["fields"]
+        ix = {k: f.index(k) for k in ("資料日期", "股票代號", "除權息前收盤價", "除權息參考價", "權/息") if k in f}
+        iv = next((i for i, k in enumerate(f) if k.startswith("權值")), None)
+        for r in j["data"]:
+            try:
+                c = str(r[ix["股票代號"]]).strip()
+                pc, ref = float(str(r[ix["除權息前收盤價"]]).replace(",", "")), float(str(r[ix["除權息參考價"]]).replace(",", ""))
+                yy, mm, dd = [int(x) for x in str(r[ix["資料日期"]]).replace("年", "/").replace("月", "/").replace("日", "").split("/")]
+            except (ValueError, KeyError, IndexError):
+                continue
+            if not (0 < ref < pc):
+                continue
+            v = None
+            try:
+                v = float(str(r[iv]).replace(",", "")) if iv is not None else None
+            except ValueError:
+                pass
+            out.setdefault(c, {})[f"{yy + 1911:04d}-{mm:02d}-{dd:02d}"] = {"f": round(ref / pc, 6), "v": v, "t": str(r[ix["權/息"]]).strip() if "權/息" in ix else None}
+    return {c: [{"date": d, **e} for d, e in sorted(v.items())] for c, v in out.items()}, ok
+
+
 def pct(vals, q):
     v = sorted(vals)
     k = (len(v) - 1) * q
@@ -81,6 +112,7 @@ for mo in months:
         for c, v in (mo.get("peNow") or {}).items():
             now_pe[c] = (mo.get("peNowDate"), v)
 ind = industries()
+DIV, DIV_OK = ({}, False) if ONLY_INDEX else divs()
 
 alli, rec_out, built = {}, {"days": None, "items": {}}, 0
 for c, x in sorted(by.items()):
@@ -102,6 +134,7 @@ for c, x in sorted(by.items()):
     method = "pb" if fin or any(s.get("pe") is None for s in snaps) else "pe"
     out = {"code": c, "name": x["name"], "sector": f"{industry or '產業無資料'}（{MKT[x['mkt']]}）", "method": method, "univ": True,
            "market": MKT[x["mkt"]], "industry": industry, "failures": [], "news": [],
+           "div": DIV.get(c, []), "divOk": DIV_OK and x["mkt"] == "twse",
            "recent": [{"date": d, "close": v} for d, v in rc], "monthly": [{k: m[k] for k in ("ym", "high", "low", "avg")} for m in monthly],
            "snapshots": snaps, "latest": {"date": rc[-1][0], "close": close} if rc else None}
     for key, bk in (("pe", "eps"), ("pb", "bvps")):
