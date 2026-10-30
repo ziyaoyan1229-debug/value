@@ -18,6 +18,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 mkt, year = sys.argv[1], int(sys.argv[2])
 tz = datetime.timezone(datetime.timedelta(hours=8))
 today = datetime.datetime.now(tz).date()
+FAILED = []  # 連線失敗（不是休市）的日子：這個月下次要整個重抓
 STOCK = re.compile(r"^[1-9]\d{3}$")
 TP = "https://www.tpex.org.tw/www/zh-tw/afterTrading/"
 
@@ -27,6 +28,8 @@ def day_rows(d):
     out = {}
     if mkt == "twse":
         j = get(f"MI_INDEX?date={d:%Y%m%d}&type=ALLBUT0999&response=json")
+        if j is None:
+            FAILED.append(d)
         if not (j and j.get("stat") == "OK"):
             return None
         tables = j.get("tables") or [{"fields": j.get(k.replace("data", "fields")), "data": j.get(k)} for k in j if re.fullmatch(r"data\d+", k)]
@@ -36,6 +39,8 @@ def day_rows(d):
         f = t["fields"]; ic, inm, iv, ia, ih, il, icl = col(f, "證券代號"), col(f, "證券名稱"), col(f, "成交股數"), col(f, "成交金額"), col(f, "最高價"), col(f, "最低價"), col(f, "收盤價")
     else:
         j = get(f"{TP}dailyQuotes?date={d:%Y}%2F{d:%m}%2F{d:%d}&type=EW&response=json")
+        if j is None:
+            FAILED.append(d)
         t = ((j or {}).get("tables") or [{}])[0]
         if not t.get("data") or str((j or {}).get("date")) != f"{d:%Y%m%d}":
             return None
@@ -85,10 +90,11 @@ for m in range(1, 13):
     if p.exists() and json.loads(p.read_text(encoding="utf-8")).get("complete"):
         print("已完成", p.name, flush=True)
         continue
+    FAILED.clear()
     rows, days, closes, d = {}, [], {}, first
     if p.exists():  # 這個月抓過一部分（每天盤後更新）：從上次最後一天的隔天接著抓
         o = json.loads(p.read_text(encoding="utf-8"))
-        if o.get("days"):
+        if o.get("days") and not o.get("redo"):
             days = o["days"]
             rows = {c: [x[0], x[1], x[2], x[3], x[4], x[5]] for c, x in o["rows"].items()}
             closes = {c: {dd: v for dd, v in zip(days, arr) if v} for c, arr in (o.get("closes") or {}).items()}
@@ -111,8 +117,11 @@ for m in range(1, 13):
     if n0 and len(days) == n0 and not nxt <= today:
         print("沒有新的交易日", p.name, flush=True)
         continue
-    out = {"ym": f"{first:%Y-%m}", "market": mkt, "days": days, "complete": nxt <= today,
+    out = {"ym": f"{first:%Y-%m}", "market": mkt, "days": days, "complete": nxt <= today and not FAILED,
            "rows": {c: [x[0], x[1], round(x[2]), round(x[3]), x[4], x[5]] for c, x in rows.items()}}
+    if FAILED:
+        out["redo"] = [f"{x:%Y-%m-%d}" for x in FAILED]
+        print("連線失敗，下次重抓整個月", out["redo"], flush=True)
     if closes:
         out["closes"] = {c: [v.get(dd) for dd in days] for c, v in closes.items()}
     if days and (m in (1, 4, 7, 10) or not out["complete"]):

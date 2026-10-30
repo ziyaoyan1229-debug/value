@@ -14,7 +14,7 @@ def get(path, retries=4, gap=2.2):
         _last[0] = time.time()
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (value-taiwan-stock)", "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=60) as r:
                 body = r.read().decode("utf-8", "replace")
             j = json.loads(body)
             return j
