@@ -1,0 +1,56 @@
+# 全部上市櫃股票的歷史資料（網站「任何股票都能查」）：每個市場、每一年各一個工作同時抓，抓完整理成每檔一份河流圖資料。
+# 第一次要抓 2021 年起全部年份；之後每月 3 日只補今年（已完成的月份會跳過）。
+name: univ
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: 年份，JSON 陣列，例如 [2025,2026]
+        required: true
+        default: '[2021,2022,2023,2024,2025,2026]'
+  schedule:
+    - cron: '30 11 3 * *'
+permissions:
+  contents: write
+concurrency:
+  group: univ
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        mkt: [twse, tpex]
+        year: ${{ fromJSON(inputs.years || '[0]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 抓資料
+        run: |
+          Y=${{ matrix.year }}; [ "$Y" = "0" ] && Y=$(TZ=Asia/Taipei date +%Y)
+          python3 tools/univ_hist.py ${{ matrix.mkt }} $Y
+      - name: commit
+        run: |
+          git config user.name Claude; git config user.email noreply@anthropic.com
+          git add data/u/m
+          git diff --cached --quiet && exit 0
+          git commit -m "全部股票月資料 ${{ matrix.mkt }} ${{ matrix.year }}"
+          for i in 1 2 3 4 5 6; do git pull --rebase origin main && git push origin main && break; sleep $((i*7)); done
+  build:
+    needs: fetch
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: 整理每檔河流圖
+        run: git pull origin main && python3 tools/univ_build.py
+      - name: commit
+        run: |
+          git config user.name Claude; git config user.email noreply@anthropic.com
+          git add data/u
+          git diff --cached --quiet && exit 0
+          git commit -m "全部股票河流圖 $(TZ=Asia/Taipei date +%F)"
+          for i in 1 2 3 4 5 6; do git pull --rebase origin main && git push origin main && break; sleep $((i*7)); done
