@@ -1,4 +1,4 @@
-# 財務資料（月營收、毛利率、負債比、產業中位數），寫進 fund.json 並 commit。每週六、每月 11 日，也可手動。
+# 財務資料（月營收、毛利率、負債比、產業中位數），寫進 fund.json；除權息歷史與報酬指數寫進 divhist.json 並 commit。每週六、每月 11 日，也可手動。
 name: fund
 on:
   workflow_dispatch:
@@ -18,10 +18,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: 抓資料
         run: python3 tools/fetch_fund.py
+      - name: 除權息與報酬指數（含息報酬用）
+        run: python3 tools/fetch_divhist.py
       - name: commit
         run: |
           git config user.name Claude; git config user.email noreply@anthropic.com
-          git add fund.json
+          git add fund.json divhist.json
           git diff --cached --quiet && exit 0
           git commit -m "財務資料 $(date +%F)"
           for i in 1 2 3; do git pull --rebase origin main && git push origin main && break; sleep 5; done
