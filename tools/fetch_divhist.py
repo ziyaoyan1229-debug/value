@@ -51,7 +51,7 @@ d = datetime.date(START, 1, 1)
 while d <= today:
     j = get(f"https://www.twse.com.tw/rwd/zh/TAIEX/MFI94U?date={d:%Y%m}01&response=json")
     if j and j.get("stat") == "OK" and j.get("data"):
-        f = j["fields"]; i0, iv = col(f, "日期"), col(f, "報酬指數", "指數")
+        f = j["fields"]; i0, iv = 0, col(f, "報酬指數", "指數")
         rows = [(ad(r[i0]), num(r[iv])) for r in j["data"] if num(r[iv])]
         if rows:
             vals = [v for _, v in rows]
@@ -61,17 +61,34 @@ while d <= today:
         print("MFI94U 抓不到", f"{d:%Y-%m}", flush=True)
     d = (d.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
 
+# 股票分割當月：月資料前後價格混在一起，用每日收盤重算（分割前的價格除以倍數）
+SPLITS = {"0050": ("2025-06", 4)}
+split = {}
+for c, (ym, k) in SPLITS.items():
+    j = get(f"STOCK_DAY?date={ym.replace('-', '')}01&stockNo={c}&response=json")
+    if j and j.get("stat") == "OK" and j.get("data"):
+        f = j["fields"]; ih, il, icl = col(f, "最高價"), col(f, "最低價"), col(f, "收盤價")
+        rows = [[num(r[ih]), num(r[il]), num(r[icl])] for r in j["data"] if num(r[icl])]
+        cut = next((i for i in range(1, len(rows)) if rows[i][2] < rows[i - 1][2] * 0.5), None)  # 分割後第一天
+        if cut:
+            adj = [[x / k for x in r] for r in rows[:cut]] + rows[cut:]
+            split[c] = {"ym": ym, "high": round(max(r[0] for r in adj), 4), "low": round(min(r[1] for r in adj), 4),
+                        "avg": round(sum(r[2] for r in adj) / len(adj), 4), "days": len(adj), "k": k}
+    print("分割當月", c, split.get(c), flush=True)
+
 old = {}
 p = ROOT / "divhist.json"
 if p.exists():
     old = json.loads(p.read_text(encoding="utf-8"))
 if not ok_years and old:  # 全部抓不到就保留舊的
     events = old.get("events", {})
+if not split and old:
+    split = old.get("split", {})
 if not tr_m and old:
     tr_m, tr_d = old.get("tr", {}).get("monthly", {}), old.get("tr", {}).get("daily", [])
 out = {"updated": datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M"),
        "source": "臺灣證券交易所「除權除息計算結果表」（還原因子＝除權息參考價 ÷ 除權息前收盤價）、「發行量加權股價報酬指數」",
-       "events": events, "tr": {"monthly": tr_m, "daily": [list(x) for x in sorted(tr_d)[-40:]]}}
+       "events": events, "tr": {"monthly": tr_m, "daily": [list(x) for x in sorted(tr_d)]}, "split": split}
 p.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print("股票", len(events), "事件", sum(len(v) for v in events.values()), "報酬指數月數", len(tr_m))
 for c in ("2330", "0050", "0056", "2317"):

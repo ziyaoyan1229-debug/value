@@ -72,6 +72,10 @@ def daily(live, inp):
         live["market"] = {"date": today, "open": bool(date) and date == today}
     if inp.get("exdiv") is not None:
         exdiv(live, inp["exdiv"], today)
+    if inp.get("base"):  # 個股比較：1／3／5 年前那天的收盤價
+        live["base"] = {k: {"date": v["date"], "closes": {c: num(x) for c, x in v["closes"].items() if num(x)}} for k, v in inp["base"].items()}
+    if inp.get("tr"):  # 加權報酬指數（含息）最近的每日值
+        live["tr"] = {"source": "臺灣證券交易所 發行量加權股價報酬指數", "daily": [[d, num(v)] for d, v in inp["tr"] if num(v)]}
     if not date or date != today:
         return "休市或證交所還沒有今天的資料，只更新開盤狀態"
     q = live.get("quotes") or {}

@@ -42,6 +42,47 @@ if a and a.get("stat") == "OK" and t and t.get("data"):
             if r[ic] in inp["rows"]:
                 pe = r[ipe]
                 inp["rows"][r[ic]].update({"pe": None if str(pe).strip() in ("-", "") else pe, "pb": r[ipb], "yield": r[iy], "report": roc_report(r[ir]) if ir is not None else None})
+# 個股比較的漲跌起點：1、3、5 年前那天（遇假日往前找）的收盤價，和加權報酬指數（含息）最近的每日值
+def closes_on(day):
+    for k in range(8):
+        dt = day - datetime.timedelta(days=k)
+        if dt.weekday() >= 5:
+            continue
+        j = get(f"MI_INDEX?date={dt:%Y%m%d}&type=ALLBUT0999&response=json")
+        tb = next((t for t in (j or {}).get("tables", []) if "證券代號" in (t.get("fields") or []) and col(t.get("fields"), "收盤價") is not None), None)
+        if not (j and j.get("stat") == "OK" and tb and tb.get("data")):
+            continue
+        f = tb["fields"]; ic, icl = col(f, "證券代號"), col(f, "收盤價")
+        out = {r[ic]: str(r[icl]).replace(",", "") for r in tb["data"] if r[ic] in codes}
+        for t2 in j.get("tables", []):
+            f2 = t2.get("fields") or []; i2, c2 = col(f2, "指數"), col(f2, "收盤指數")
+            if None not in (i2, c2):
+                for r in t2.get("data") or []:
+                    if str(r[i2]).strip() == "發行量加權股價指數":
+                        out["TAIEX"] = str(r[c2]).replace(",", "")
+        return {"date": f"{dt:%Y-%m-%d}", "closes": out}
+    return None
+
+
+inp["base"] = {}
+for yrs in (1, 3, 5):
+    try:
+        day = today.replace(year=today.year - yrs)
+    except ValueError:  # 2/29
+        day = today.replace(year=today.year - yrs, day=28)
+    b0 = closes_on(day)
+    if b0:
+        inp["base"][f"{yrs}y"] = b0
+inp["tr"] = []
+for m0 in sorted({today.replace(day=1), (today.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)}):
+    j = get(f"https://www.twse.com.tw/rwd/zh/TAIEX/MFI94U?date={m0:%Y%m}01&response=json")
+    if j and j.get("stat") == "OK" and j.get("data"):
+        f = j["fields"]; i0, iv = 0, col(f, "報酬指數", "指數")
+        for r in j["data"]:
+            y, mm, dd2 = [int(x) for x in str(r[i0]).strip().split("/")]
+            inp["tr"].append([f"{y + 1911:04d}-{mm:02d}-{dd2:02d}", str(r[iv]).replace(",", "")])
+print("漲跌起點", {k: (v["date"], len(v["closes"])) for k, v in inp["base"].items()}, "報酬指數", inp["tr"][-1:] , flush=True)
+
 x = get("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL")  # 除權除息預告（休市也抓）
 if isinstance(x, list):
     inp["exdiv"] = []
