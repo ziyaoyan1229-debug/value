@@ -155,6 +155,20 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .debate p{margin:2px 0 0}
 .srcs{margin-top:8px;font-size:13px}
 .srcs summary{cursor:pointer;color:var(--accent)}
+.legal-links{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 28px;font-size:14px}
+.legal-links a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.legal-links a:hover{color:var(--accent)}
+.legal .lgtabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
+.legal .lgtabs .gtab{text-decoration:none}
+.legal .lgtabs .gtab.on{background:var(--accent-soft);color:var(--strong);border-color:var(--accent)}
+.lgbody{font-size:16.5px;line-height:1.85;max-width:760px}
+.lgbody h2{margin:0 0 4px}
+.lgbody h3{margin:22px 0 6px;font-size:18px;color:var(--strong)}
+.lgbody h3.lg-one{color:var(--accent)}
+.lgbody ul,.lgbody ol{padding-left:1.4em;margin:6px 0}
+.lgbody li{margin:4px 0}
+.lgbody a{color:var(--accent)}
+.lgbody .disclaimer{margin-top:24px}
 .disclaimer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);font-weight:700}
 .nodata{color:var(--muted);font-style:normal}
 .gbar{display:flex;gap:6px;align-items:center;padding-block:12px 4px;min-width:0}
@@ -389,6 +403,7 @@ dialog.ntf.small{width:min(360px,calc(100vw - 32px));margin:calc(env(safe-area-i
   </header>
   <main id="app"></main>
   <p class="disclaimer">這是研究參考，不是投資保證，請自己決定。</p>
+  <nav class="legal-links" aria-label="網站條款"><a href="#legal-disclaimer">免責聲明</a><a href="#legal-terms">使用條款</a><a href="#legal-privacy">隱私政策</a><a href="#legal-risk">風險提示</a></nav>
 </div>
 
 <script>
@@ -1708,13 +1723,24 @@ function cmpPage() {
 // 首頁和比較頁共用群組列：切換、編輯群組之後重畫目前這一頁
 function mainView() { const nd = univNeeded(); if (nd.length) univEnsure(nd).then(ok => { if (ok) mainView(); }); if (/^#cmp/.test(location.hash)) cmpPage(); else if (/^#my/.test(location.hash)) myPage(); else if (/^#calc/.test(location.hash)) calcPage(); else home(); }
 
+// 免責聲明、使用條款、隱私政策、風險提示：內容來自共享資料夾 價值台股/條款/*.md（改 .md 後重跑 legal.py）
+const LEGAL = {"disclaimer": {"t": "免責聲明", "h": "<p class=\"muted small\">生效日期：2026 年 11 月 4 日</p><h3 class=\"lg-one\">一句話說明</h3><p>這個網站只是幫你整理資料、做研究參考，不是投資建議，也不保證會賺錢。買不買、賣不賣，都由你自己決定。</p><h3>本站是什麼</h3><ul><li>「Value 價值台股」是個人製作的免費研究工具，把公開的股價、本益比、淨值比、殖利率等資料整理成圖表。</li><li>本站不是證券投資顧問公司，也沒有經過金管會核准提供投資建議。</li><li>本站不幫任何人下單，不連接券商或銀行，不經手任何人的錢。</li></ul><h3>「便宜」「合理」「昂貴」和燈號是什麼意思</h3><ul><li>河流圖上的「低估」「合理」「高估」，只是拿現在的倍數和這檔股票過去五年的倍數比較，看它落在哪個位置。</li><li>「可分批買」「續抱」「觀察」「注意」這些燈號，是用固定規則和公開資料整理出來的研究結論，不是叫你買或賣。</li><li>過去的區間不代表未來一定會回到那裡。公司的獲利改變，合理的價位也會跟著改變。</li></ul><h3>資料可能有錯或延遲</h3><ul><li>資料主要來自臺灣證券交易所、證券櫃檯買賣中心，以及新聞、法人報告等公開來源，每個數字都盡量附上來源。</li><li>資料可能延遲、缺漏或抄錯。抓不到的資料，網站會寫「無資料」，不會自己編數字。</li><li>盤中即時價可能比實際成交慢幾十秒到幾分鐘。重要的決定請以券商下單畫面和官方公告為準。</li></ul><h3>「問 AI」的回答</h3><ul><li>按「問 AI」會把本站整理好的這檔股票資料，交給你選的 AI 服務（Claude、ChatGPT、Gemini、Grok、DeepSeek）回答。</li><li>AI 的回答可能有錯，也可能和本站的燈號不同。那些回答不代表本站的看法。</li></ul><h3>責任範圍</h3><ul><li>你根據本站內容做的任何投資決定，結果由你自己負責。本站和製作者不負責因此產生的任何損失。</li><li>網站可能因為維修、資料來源停止服務或其他原因暫停，恕不另行通知。</li></ul><p class=\"disclaimer\">這是研究參考，不是投資保證，請自己決定。</p>"}, "terms": {"t": "使用條款", "h": "<p class=\"muted small\">生效日期：2026 年 11 月 4 日</p><h3 class=\"lg-one\">一句話說明</h3><p>使用本站，就表示你同意下面這些規則：網站免費、只做研究參考、你自己做決定、不要拿來做壞事。</p><h3>一、服務內容</h3><ul><li>本站免費提供台股的股價、評價區間（河流圖）、K 線、除權息行事曆、個股比較、回測、存股試算、「我的持股」記帳和收盤後通知。</li><li>本站只提供研究參考，不提供下單、代操、借錢買股、融資融券、期貨或選擇權等任何服務。</li><li>功能、資料範圍和畫面可能隨時調整、增加或停止。</li></ul><h3>二、你使用本站時要注意</h3><ul><li>投資決定由你自己做。請先讀過<a href=\"#legal-disclaimer\">〈免責聲明〉</a>和<a href=\"#legal-risk\">〈風險提示〉</a>。</li><li>「我的持股」和「存股試算」裡的數字是你自己輸入的，請自己確認是否正確。網站算出的損益和試算結果只是估計，實際金額以券商對帳單為準。</li><li>請不要用程式大量抓取本站或本站的即時價服務，也不要試圖攻擊、癱瘓或破解網站。</li><li>請不要把本站的內容包裝成付費的投資建議或「明牌」轉賣給別人。</li></ul><h3>三、資料與內容的來源</h3><ul><li>股價、本益比、淨值比、殖利率、除權息等資料，版權屬於臺灣證券交易所、證券櫃檯買賣中心等原始提供者。</li><li>新聞和法人報告的內容屬於原作者，本站只引用重點並附上原文連結。</li><li>本站自己做的圖表和文字，歡迎個人分享，請註明出處。</li></ul><h3>四、第三方服務</h3><p>本站會用到一些別人的服務，例如 GitHub（放網站）、Cloudflare（即時價和推播）、Google 字型，以及你在「問 AI」選的 AI 服務。使用這些服務時，也要遵守它們各自的規則。</p><h3>五、服務中斷</h3><p>網站可能因為維修、資料來源改版、免費主機額度用完或其他原因，暫時無法使用或資料沒有更新。本站會盡量修好，但不保證隨時都能用。</p><h3>六、條款修改</h3><p>本條款可能修改。修改後會更新上方的生效日期，修改後繼續使用本站，就表示你同意新的條款。</p><h3>七、聯絡我們</h3><p>有問題或發現資料錯誤，可以到本站的 GitHub 專案頁留言：<a href=\"https://github.com/ziyaoyan1229-debug/value/issues\" target=\"_blank\" rel=\"noopener\">github.com/ziyaoyan1229-debug/value/issues</a>，或直接告訴介紹你使用本站的人。</p><p class=\"disclaimer\">這是研究參考，不是投資保證，請自己決定。</p>"}, "privacy": {"t": "隱私政策", "h": "<p class=\"muted small\">生效日期：2026 年 11 月 4 日</p><h3 class=\"lg-one\">一句話說明</h3><p>你的持股、群組和設定，平常只存在你自己這台手機或電腦裡；只有你選擇用 Google 登入，才會存到雲端讓你換裝置也能用。本站不要你的電話或身分證，也不碰任何帳號密碼。</p><h3>一、存在你這台裝置上的資料</h3><p>下面這些資料只存在你瀏覽器裡（技術上叫「本機儲存空間」），本站的伺服器拿不到：</p><ul><li>我的持股：你輸入的股票、股數、平均成本。</li><li>自選群組：你建立的群組和裡面的股票。</li><li>存股試算：你填的每月投入、年數、殖利率。</li><li>通知設定和最近 100 則通知紀錄。</li><li>外觀設定：深夜或白天模式、大字模式。</li><li>K 線暫存：為了下次打開比較快，暫時存起來的日 K 資料。</li></ul><p>換手機、換瀏覽器，或清除瀏覽器資料，這些資料就會不見。沒有登入 Google 時本站沒有備份，請自己留意；登入的話請看下方第三節。</p><h3>二、什麼時候資料會離開你的裝置</h3><ol><li>開啟手機推播時：會把「推播通道代碼」（瀏覽器產生的一串亂碼，用來把通知送到你的裝置）、你要追蹤的股票代號、要收哪幾種通知，以及登記時間，存在本站放在 Cloudflare 的推播伺服器。不包含你的姓名、持股股數或成本。關閉推播，或這個通道失效時，這筆資料就會刪除。</li><li>看盤中即時價和 5 分 K 時：網頁會把股票代號送到本站的 Cloudflare 伺服器，由它去向證交所和 Yahoo 查價。查到的價格只在記憶體裡暫放一下讓大家共用，不會寫下來，也不記錄是誰查的。</li><li>看日 K 時：你的瀏覽器會直接向臺灣證券交易所網站抓資料。</li><li>按「問 AI」時：會把這檔股票的公開資料和問題，交給你選的 AI 服務（Claude、ChatGPT、Grok 會開新視窗帶入問題；Gemini、DeepSeek 會先複製到剪貼簿，讓你自己貼上）。送出的內容不包含你的持股和成本。之後的對話依那家 AI 公司的隱私政策處理。</li><li>在 Claude 網站裡打開本站時：你的自選群組會存進 Claude 的網頁資料庫，綁在你的 Claude 帳號下，讓你換裝置也看得到。</li></ol><h3>三、Google 登入（如果你選擇使用）</h3><ul><li>登入是自由選擇，不登入也可以使用全部功能。開場動畫後和「設定」裡都有登入按鈕；按「先不用，直接看」之後，開場就不會再問。</li><li>登入只是為了把你的自選群組、我的持股、存股試算、通知設定和外觀設定（深夜或白天、大字模式）存到雲端，讓你換手機或電腦也能接著用。K 線暫存和通知紀錄不會上傳。</li><li>登入時，Google 只會給本站你的帳號編號、名字、電子郵件和大頭貼（權限只有「基本資料」和「電子郵件」）。本站拿不到你的 Google 密碼，也不能讀你的信件、雲端硬碟或通訊錄。</li><li>雲端資料存在本站放在 Cloudflare 的伺服器，只用 Google 帳號編號當作索引，名字、電子郵件和大頭貼不會存在伺服器上，只顯示在你自己的畫面。</li><li>登入後你的瀏覽器會收到一張本站簽發的登入憑證，有效 180 天，存在這台裝置；只有帶著這張憑證才能讀寫你的雲端資料，所以只有你本人看得到。本站不會賣給、也不會分享給任何人。</li><li>登入後每次修改，大約 1.5 秒後會自動存到雲端；在別台裝置打開網站時，會拿雲端的版本來用。</li><li>你可以隨時在「設定」裡登出，或按「刪除雲端資料並登出」，伺服器上你的資料會立刻刪掉。</li></ul><h3>四、別的公司可能看到的連線資訊</h3><ul><li>網站放在 GitHub Pages，字型來自 Google 字型，即時價和推播服務放在 Cloudflare。你連到這些服務時，它們可能依自己的規定，記錄你的連線資訊（例如 IP 位址、瀏覽器種類）。</li><li>本站沒有放廣告，沒有放追蹤或流量統計程式，也沒有使用追蹤用的 Cookie。</li></ul><h3>五、本站絕對不做的事</h3><ul><li>不要你的身分證字號、銀行帳號、券商帳號或任何密碼。</li><li>不連接券商或銀行，不幫你下單。</li><li>不賣或分享你的資料給別人。</li><li>如果有人假冒本站跟你要密碼或錢，請不要理會，那一定是詐騙。</li></ul><h3>六、如何刪除你的資料</h3><ul><li>本機資料：在瀏覽器設定裡清除這個網站的資料就會全部刪除；只想刪持股，在「我的持股」裡一筆一筆刪掉即可。</li><li>推播資料：在設定裡關閉「手機推播」。</li><li>雲端資料（有用 Google 登入時）：在設定裡按「刪除雲端資料並登出」，會立刻刪除。</li></ul><h3>七、政策修改與聯絡我們</h3><p>本政策修改時會更新生效日期。有任何問題，可以到 <a href=\"https://github.com/ziyaoyan1229-debug/value/issues\" target=\"_blank\" rel=\"noopener\">github.com/ziyaoyan1229-debug/value/issues</a> 留言，或直接告訴介紹你使用本站的人。</p><p class=\"disclaimer\">這是研究參考，不是投資保證，請自己決定。</p>"}, "risk": {"t": "風險提示", "h": "<p class=\"muted small\">生效日期：2026 年 11 月 4 日</p><h3 class=\"lg-one\">一句話說明</h3><p>買股票有可能賠錢，甚至賠掉一大部分本金。請只用短期內用不到的閒錢，分批慢慢來。</p><h3>一、股票本來就會漲也會跌</h3><ul><li>股價每天都會變動，單日最多可以漲跌 10%。遇到金融海嘯、疫情這類大事，好公司的股價也可能一年跌掉三到五成。</li><li>已經下跌的股票，可能還會再跌。「便宜」之後還可能更便宜。</li></ul><h3>二、過去不代表未來</h3><ul><li>河流圖的「便宜、合理、昂貴」，是拿過去五年的本益比或淨值比來比較。如果公司的生意變好或變差，過去的區間就不一定準。</li><li>回測和存股試算都是用過去的資料或你假設的數字計算，未來的報酬可能高很多，也可能低很多。</li></ul><h3>三、股利不是保證的</h3><ul><li>公司賺得少或要投資，股利可能減少，甚至不發。</li><li>殖利率高，有時是因為股價跌很多，不一定是好事。</li><li>ETF 的配息也會變動，有時配的是本金，不是賺來的錢。</li></ul><h3>四、資料和通知可能出錯</h3><ul><li>資料可能延遲、缺漏或有錯。重要決定前，請看官方公告和券商畫面。</li><li>收盤後的推播可能晚到或沒收到，不要只靠通知決定買賣。</li><li>「今日重點」和「問 AI」是整理公開資訊的結果，可能漏掉重要消息，也可能判斷錯誤。</li></ul><h3>五、集中在少數股票的風險</h3><ul><li>錢集中在一兩檔股票或同一個產業（例如都是半導體），一出事就會一起跌。</li><li>分散在不同產業，或用市值型 ETF，可以降低單一公司出事的影響。</li></ul><h3>六、保守投資的提醒</h3><ul><li>先留好半年到一年的生活費和醫療費，再拿閒錢投資。</li><li>不要借錢買股票，不要拿房子去貸款買股票。</li><li>分批買，不要一次全部買進。</li><li>不要相信「保證獲利」「內線明牌」「帶你操作」，這些常常是詐騙。</li><li>看不懂的商品就不要買。</li></ul><h3>七、遇到詐騙怎麼辦</h3><p>本站不會打電話、傳訊息或加 LINE 叫你投資或匯款。接到可疑的投資邀請，請撥 165 反詐騙專線查證。</p><p class=\"disclaimer\">這是研究參考，不是投資保證，請自己決定。</p>"}};
+function legalPage(k) {
+  if (!LEGAL[k]) k = 'disclaimer';
+  const d = LEGAL[k];
+  $('#app').innerHTML = `<div class="legal"><p><a href="#home">← 回首頁</a></p>
+    <div class="lgtabs" role="tablist">${Object.entries(LEGAL).map(([id, x]) => `<a class="gtab${id === k ? ' on' : ''}" href="#legal-${id}" role="tab" aria-selected="${id === k}">${x.t}</a>`).join('')}</div>
+    <article class="box lgbody"><h2>${d.t}</h2>${d.h}</article></div>`;
+  document.title = d.t + '｜Value 價值台股';
+}
 function route(keepScroll) {
   if (!DATA) { $('#app').innerHTML = '<p class="nodata">無資料</p>'; return; }
   const need = univNeeded();
   if (need.length) univEnsure(need).then(ok => { if (ok) route(true); else if (/^#s\d{4}/.test(location.hash) && !DATA.stocks.some(s => '#s' + s.code === location.hash.slice(0, 6))) $('#app').innerHTML = `<p class="nodata">找不到這檔股票的資料（無資料）。<a href="#home">回首頁</a></p>`; });
   const h = location.hash.slice(1), m = h.match(/^s([0-9A-Z]{4,6})(?:-(today|k|bt))?$/);
   const y = window.scrollY;
-  if (m) detail(m[1], m[2] || 'river'); else if (/^cmp\b/.test(h)) cmpPage(); else if (/^my\b/.test(h)) myPage(); else if (/^calc\b/.test(h)) calcPage(); else home();
+  if (m) detail(m[1], m[2] || 'river'); else if (/^cmp\b/.test(h)) cmpPage(); else if (/^my\b/.test(h)) myPage(); else if (/^calc\b/.test(h)) calcPage(); else if (/^legal-/.test(h)) legalPage(h.slice(6)); else home();
+  if (!/^legal-/.test(h)) document.title = 'Value 價值台股';
   window.scrollTo(0, keepScroll ? y : 0);
   const toEnd = () => document.querySelectorAll('.chart').forEach(c => { c.scrollLeft = c.scrollWidth; }); // 圖表預設停在最新的時間
   toEnd(); requestAnimationFrame(toEnd);
