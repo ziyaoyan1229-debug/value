@@ -72,7 +72,7 @@ const KINDS = ['buy', 'over', 'move', 'limit', 'limitdn'];
 // 權杖是發給本網站的（tokeninfo 的 aud／azp＝本站用戶端 ID）、還沒過期，再拿帳號編號、名字、email、大頭貼。
 // 驗過就發一張自己簽的登入憑證（HMAC 金鑰第一次用到時產生，存在 KV），之後存取資料都用這張憑證，不再找 Google。
 // 只用 Google 帳號編號（sub）當 key；名字、email、大頭貼只回給網站顯示，不寫進 KV。
-const GOOGLE_CLIENT_ID = '';
+const GOOGLE_CLIENT_ID = '18045086857-igsdekjbltpc1osh84gt2ipim37hu3pa.apps.googleusercontent.com';
 async function verifyGoogle(token) {
   if (!/^[\w.\-~+/=]{20,4096}$/.test(String(token || ''))) throw new Error('bad token');
   const ti = await (await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token))).json();
