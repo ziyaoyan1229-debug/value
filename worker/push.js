@@ -9,6 +9,10 @@
 //   GET  /stats Authorization: Bearer <PUSH_KEY>  → { subs }
 //   GET  /rt?c=2330,2454                 → 盤中即時價（轉送證交所基本市況報導 mis.twse.com.tw，不存任何資料，同一台機器 15 秒內共用結果）
 //   GET  /k5?c=2330                      → 最近一個交易日的 5 分 K（轉送 Yahoo Finance，60 秒內共用結果）
+//   POST /login { access_token }         → Google 登入：向 Google 確認 OAuth 權杖，回 { token, name, email, picture }（token 是本後端簽的登入憑證，180 天有效）
+//   GET  /me    Authorization: Bearer <token>   → { data, at }：這個帳號存的群組、持股、存股試算、顯示設定
+//   PUT  /me    Authorization: Bearer <token>  { data } → 存起來（KV，key＝user:<Google 帳號編號>，最多 200 KB）
+//   DELETE /me  Authorization: Bearer <token>   → 刪掉這個帳號存在後端的資料
 const SITE = 'https://ziyaoyan1229-debug.github.io/value/';
 const enc = new TextEncoder();
 const b64u = buf => { let s = ''; for (const b of new Uint8Array(buf)) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -64,6 +68,29 @@ async function allSubs(env) {
   return out;
 }
 const KINDS = ['buy', 'over', 'move', 'limit', 'limitdn'];
+// Google 登入：網站用 Google 的登入視窗拿到 OAuth 權杖（只有 openid、email、profile 權限），這裡向 Google 確認
+// 權杖是發給本網站的（tokeninfo 的 aud／azp＝本站用戶端 ID）、還沒過期，再拿帳號編號、名字、email、大頭貼。
+// 驗過就發一張自己簽的登入憑證（HMAC 金鑰第一次用到時產生，存在 KV），之後存取資料都用這張憑證，不再找 Google。
+// 只用 Google 帳號編號（sub）當 key；名字、email、大頭貼只回給網站顯示，不寫進 KV。
+const GOOGLE_CLIENT_ID = '';
+async function verifyGoogle(token) {
+  if (!/^[\w.\-~+/=]{20,4096}$/.test(String(token || ''))) throw new Error('bad token');
+  const ti = await (await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token))).json();
+  if (!ti || (ti.aud !== GOOGLE_CLIENT_ID && ti.azp !== GOOGLE_CLIENT_ID) || !ti.sub || !(+ti.exp * 1000 > Date.now())) throw new Error('bad token');
+  const u = await (await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { authorization: 'Bearer ' + token } })).json();
+  if (!u || u.sub !== ti.sub) throw new Error('bad user');
+  return u;
+}
+async function authKey(env) {
+  let raw = await env.SUBS.get('authkey');
+  if (!raw) { raw = b64u(crypto.getRandomValues(new Uint8Array(32))); await env.SUBS.put('authkey', raw); }
+  return S.importKey('raw', ub64(raw), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+async function issue(env, sub) { const p = b64u(enc.encode(JSON.stringify({ u: sub, e: Date.now() + 180 * 86400e3 }))); return p + '.' + b64u(await S.sign('HMAC', await authKey(env), enc.encode(p))); }
+async function whoami(req, env) {
+  const t = (req.headers.get('authorization') || '').replace(/^Bearer /, ''), [p, sig] = t.split('.'); if (!sig) return null;
+  try { if (!await S.verify('HMAC', await authKey(env), ub64(sig), enc.encode(p))) return null; const b = JSON.parse(new TextDecoder().decode(ub64(p))); return b.e > Date.now() ? b.u : null; } catch (e) { return null; }
+}
 // 證交所和 Yahoo 都不讓網頁直接抓，所以這裡轉一手；只放在記憶體裡短暫共用，不寫 KV
 const MEMO = new Map();
 async function memo(key, ttl, fn) {
@@ -108,7 +135,7 @@ async function k5(code) {
 export default {
   async fetch(req, env) {
     const u = new URL(req.url), p = u.pathname.replace(/\/+$/, '');
-    if (req.method === 'OPTIONS') return new Response(null, { headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,authorization', 'access-control-max-age': '86400' } });
+    if (req.method === 'OPTIONS') return new Response(null, { headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS', 'access-control-allow-headers': 'content-type,authorization', 'access-control-max-age': '86400' } });
     try {
       if (p === '/vapid') return json({ key: (await vapid(env)).pub });
       if (p === '/sub' && req.method === 'POST') {
@@ -131,6 +158,22 @@ export default {
       if (p === '/kd' && req.method === 'GET') { // 上櫃股票的日 K（證交所網站沒有上櫃個股日成交），Yahoo .TWO 近兩年
         const c = codesOf(u)[0]; if (!c || c === 'TAIEX') return json({ error: 'no code' }, 400);
         return json(await memo('kd:' + c, 30 * 60e3, () => k5one(c + '.TWO', '1d', '2y')));
+      }
+      if (p === '/login' && req.method === 'POST') {
+        if (!GOOGLE_CLIENT_ID) return json({ error: 'login not configured' }, 503);
+        let g; try { g = await verifyGoogle((await req.json()).access_token); } catch (e) { return json({ error: 'invalid google token' }, 401); }
+        return json({ token: await issue(env, g.sub), name: g.name || null, email: g.email || null, picture: g.picture || null });
+      }
+      if (p === '/me') {
+        const uid = await whoami(req, env); if (!uid) return json({ error: 'unauthorized' }, 401);
+        const k = 'user:' + uid;
+        if (req.method === 'GET') return json((await env.SUBS.get(k, 'json')) || { data: null, at: null });
+        if (req.method === 'PUT') {
+          const t = await req.text(); if (t.length > 200000) return json({ error: 'too large' }, 413);
+          const d = JSON.parse(t); if (!d || typeof d.data !== 'object') return json({ error: 'bad data' }, 400);
+          const at = new Date().toISOString(); await env.SUBS.put(k, JSON.stringify({ data: d.data, at })); return json({ ok: true, at });
+        }
+        if (req.method === 'DELETE') { await env.SUBS.delete(k); return json({ ok: true }); }
       }
       if (p === '/unsub' && req.method === 'POST') { const d = await req.json(); if (d && d.endpoint) await env.SUBS.delete(await idOf(d.endpoint)); return json({ ok: true }); }
       if (p === '/send' && req.method === 'POST') {
