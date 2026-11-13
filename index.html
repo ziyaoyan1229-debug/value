@@ -172,6 +172,13 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-off
 .gtab:hover{border-color:var(--accent)}
 .gadd{border-style:dashed;color:var(--muted)}
 .gedit{color:var(--muted)}
+dialog.gedlg{margin:calc(env(safe-area-inset-top) + 48px) auto auto;max-height:calc(100dvh - 96px);overflow:hidden}dialog.gedlg[open]{display:flex;flex-direction:column}
+.gedlg .body{display:grid;gap:8px;flex:1 1 auto;min-height:0}.gedlg .body input:not([type=checkbox]){font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;box-sizing:border-box}
+.gedlg .gpick{display:grid;gap:6px}.gedlg .gpick label{display:flex;align-items:center;gap:8px}.gedlg .gefoot{margin:0;padding:12px 16px;border-top:1px solid var(--line)}.gedlg .danger{color:var(--rich);border-color:var(--rich)}
+.gesub{margin:10px 0 0;font-size:14px}
+.gecur{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 14px}
+.gerow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}.gerow:last-child{border-bottom:0}.gerow .nm{flex:1 1 auto}.gerow .gtab{padding:3px 10px;font-size:12.5px}
+.gefoot{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .geditor{display:grid;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-top:6px}
 .geditor input#g-q{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;max-width:360px}
 .gpick label[hidden]{display:none}
@@ -613,22 +620,55 @@ function topNav(on) {
 function groupBar() {
   const n = G.list.length, rows = (n > 1 ? [0, 1, 2, 3, 4] : [0]).map(() => G.list.map((g, i) => `<div class="wrow${i === G.cur ? ' on' : ''}" data-i="${i}" role="option" aria-selected="${i === G.cur}"><span class="wn">${esc(g.name)}</span><span class="muted">${g.codes.length} 檔</span></div>`).join('')).join('');
   const add = `<button class="gtab gadd" type="button" id="g-add" aria-label="新增群組" title="${G.list.length < G_LIMIT ? '新增群組' : '最多十個群組'}"${G.list.length < G_LIMIT ? '' : ' disabled'}>＋</button>`;
-  const g = G.list[G.cur];
-  const editor = G.editing ? `<div class="geditor">
-      <label class="muted" for="g-name" style="font-size:12px">群組名稱</label>
+  return `<div class="gbar gwbar">${add}<div class="wheel gwheel" id="gwheel" role="listbox" aria-label="群組，上下滾動切換">${rows}</div><button class="gtab gedit" type="button" id="g-edit">✎ 編輯</button></div>`;
+}
+// 編輯群組：和「＋新增」一樣跳出一個視窗編輯，按「完成」或 ✕ 關掉回到原本的畫面
+function gOpenEdit() {
+  if (G.cur >= G.list.length) G.cur = 0;
+  const g = G.list[G.cur]; G.q = '';
+  const d = document.createElement('dialog'); d.className = 'ntf gedlg';
+  d.innerHTML = `<div class="hd"><h3>編輯群組</h3><button class="gtab" type="button" id="ge-x" aria-label="關閉">✕</button></div><div class="body"></div>
+    <div class="gefoot">${G.list.length > 1 ? `<button class="gtab danger" type="button" id="g-del">刪除這個群組</button>` : ''}<span style="flex:1"></span><button class="gtab" type="button" id="g-done" aria-pressed="true">完成</button></div>`;
+  document.body.appendChild(d);
+  const body = d.querySelector('.body');
+  const keepName = () => { const el = d.querySelector('#g-name'), n = el && el.value.trim(); if (n) g.name = n.slice(0, 12); };
+  const bindPick = () => body.querySelectorAll('.gpick input[type=checkbox]').forEach(cb => cb.onchange = () => {
+    keepName(); const c = cb.dataset.code; g.codes = cb.checked ? (g.codes.includes(c) ? g.codes : g.codes.concat(c)) : g.codes.filter(x => x !== c);
+    saveGroups(); draw(); const q2 = body.querySelector('#g-q'); if (q2 && G.q) { q2.focus(); q2.setSelectionRange(q2.value.length, q2.value.length); } });
+  function draw() {
+    const y = body.scrollTop;
+    const cur = g.codes.map(c => { const s = DATA.stocks.find(x => x.code === c), u = UNIV && UNIV.items[c], nm = s ? s.name : u ? u[0] : c;
+      return `<div class="gerow"><span class="muted num">${s && s.kind === 'index' ? '大盤' : c}</span><span class="nm">${esc(nm)}</span><button class="gtab" type="button" data-rm="${c}" aria-label="移除${esc(nm)}">移除</button></div>`; }).join('');
+    body.innerHTML = `<label class="muted" for="g-name" style="font-size:12px">群組名稱</label>
       <input id="g-name" maxlength="12" value="${esc(g.name)}">
+      <h4 class="gesub">加入股票</h4>
       <input id="g-q" type="search" placeholder="搜尋代號、名稱或產業" value="${esc(G.q)}" autocomplete="off">
       <div class="gpick">${gPickHtml(g)}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="gtab" type="button" id="g-done" aria-pressed="true">完成</button>${G.list.length > 1 ? `<button class="gtab" type="button" id="g-del">刪除這個群組</button>` : ''}</div>
-    </div>` : '';
-  return `<div class="gbar gwbar">${add}<div class="wheel gwheel" id="gwheel" role="listbox" aria-label="群組，上下滾動切換">${rows}</div><button class="gtab gedit" type="button" id="g-edit" aria-pressed="${G.editing}">${G.editing ? '收起' : '✎ 編輯'}</button></div>${editor}`;
+      <h4 class="gesub">目前的股票（${g.codes.length} 檔）</h4>
+      <div class="gecur">${cur || '<p class="muted" style="margin:6px 0">還沒有股票，在上面搜尋後勾選就加入。</p>'}</div>`;
+    body.scrollTop = y;
+    body.querySelector('#g-name').onchange = () => { keepName(); saveGroups(); };
+    body.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { keepName(); g.codes = g.codes.filter(x => x !== b.dataset.rm); saveGroups(); draw(); });
+    const gq = body.querySelector('#g-q'); gq.oninput = () => { G.q = gq.value; body.querySelector('.gpick').innerHTML = gPickHtml(g); bindPick(); };
+    bindPick();
+  }
+  draw();
+  if (!UNIV) univIndex().then(() => { if (d.open) { const pk = body.querySelector('.gpick'); pk.innerHTML = gPickHtml(g); bindPick(); } });
+  const close = () => { keepName(); saveGroups(); d.close(); };
+  d.querySelector('#ge-x').onclick = close; d.querySelector('#g-done').onclick = close;
+  d.addEventListener('click', e => { if (e.target === d) close(); });
+  const del = d.querySelector('#g-del'); if (del) del.onclick = async () => {
+    if (!await gAsk({title: `確定刪除「${g.name}」？`, ok: '刪除', danger: true})) return;
+    G.list.splice(G.cur, 1); G.cur = 0; saveGroups(); d.close(); };
+  d.addEventListener('close', () => { G.q = ''; d.remove(); const y = window.scrollY; mainView(); window.scrollTo(0, y); });
+  d.showModal(); if (document.activeElement) document.activeElement.blur();
 }
 function bindGroups() {
-  wheelBind($('#gwheel'), G.list.length, G.cur, i => { G.cur = i; G.editing = false; G.q = ''; G.pick = null; const y = window.scrollY; mainView(); window.scrollTo(0, y); }, () => { G.editing = !G.editing; G.q = ''; mainView(); }); // 點已選的群組＝打開／收起編輯
-  $('#g-edit').onclick = () => { G.editing = !G.editing; G.q = ''; mainView(); };
+  wheelBind($('#gwheel'), G.list.length, G.cur, i => { G.cur = i; G.editing = false; G.q = ''; G.pick = null; const y = window.scrollY; mainView(); window.scrollTo(0, y); }, gOpenEdit); // 點已選的群組＝到編輯群組頁
+  $('#g-edit').onclick = gOpenEdit;
   const add = $('#g-add'); if (add) add.onclick = async () => { // 先取名字，按確定才建立；新群組選取並置中，接著打開編輯加股票
     const name = await gAsk({title: '新增群組', value: `群組${G.list.length + 1}`}); if (!name || G.list.length >= G_LIMIT) return;
-    G.list.push({name: name.slice(0, 12), codes: []}); G.cur = G.list.length - 1; G.q = ''; G.editing = true; G.pick = null; saveGroups(); mainView(); };
+    G.list.push({name: name.slice(0, 12), codes: []}); G.cur = G.list.length - 1; G.pick = null; saveGroups(); gOpenEdit(); };
   const done = $('#g-done'); if (done) done.onclick = () => { G.q = ''; const n = $('#g-name').value.trim(); if (n) G.list[G.cur].name = n.slice(0, 12); G.editing = false; saveGroups(); mainView(); };
   const del = $('#g-del'); if (del) del.onclick = async () => { // 刪除要再按一次確定
     if (!await gAsk({title: `確定刪除「${G.list[G.cur].name}」？`, ok: '刪除', danger: true})) return;
@@ -670,7 +710,7 @@ function home() {
     <div class="ticker">${closed ? '<span class="flat">未開盤</span>' : ''}${tick}</div>
     ${P ? `<div class="chartbox preview"><div class="charttools"><a class="pvname" href="#s${P.code}"><span class="muted num">${P.code}</span> ${P.name} <span class="muted">${MNAME[P.method]}河流圖 ›</span></a><span class="pill ${P.verdict.zone}">${P.verdict.zone}</span></div>
       <div class="chart pvchart" role="link" tabindex="0" aria-label="看${P.name}的詳細資料">${riverSVG(P, P.method)}</div></div>` : ''}
-    ${SHOW.length ? '' : `<div class="gempty">這個群組還沒有股票。${G.editing ? '在上面搜尋代號、名稱或產業，勾選就加入。' : '再點一次上面的群組名稱，就能搜尋並勾選股票。'}</div>`}<div class="tbl-wrap"${SHOW.length ? '' : ' hidden'}><table class="q"><thead><tr><th>股票</th><th>成交</th><th>漲跌</th><th>評價倍數</th><th>五年位置</th><th>參考買進</th><th>合理價</th><th>參考減碼</th><th>評價</th><th>近20日</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${SHOW.length ? '' : `<div class="gempty">這個群組還沒有股票。按上面的「✎ 編輯」，就能搜尋並勾選股票。</div>`}<div class="tbl-wrap"${SHOW.length ? '' : ' hidden'}><table class="q"><thead><tr><th>股票</th><th>成交</th><th>漲跌</th><th>評價倍數</th><th>五年位置</th><th>參考買進</th><th>合理價</th><th>參考減碼</th><th>評價</th><th>近20日</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${SHOW.length ? exdivPanel(SHOW.map(s => s.code)) : ''}
     <div class="homegrid">
       ${briefs ? `<div class="panel2"><h4>今日重點　研究員 × 唱反調</h4>${briefs}</div>` : ''}
